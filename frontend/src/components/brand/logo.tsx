@@ -19,12 +19,12 @@ const sizes = {
 };
 
 const textColors = {
-  default: { command: "text-navy-900", desk: "text-teal" },
-  icon: { command: "text-navy-900", desk: "text-teal" },
-  white: { command: "text-white", desk: "text-teal-300" },
-  black: { command: "text-navy-900", desk: "text-teal" },
-  gradient: { command: "text-navy-900", desk: "text-teal" },
-  dark: { command: "text-white", desk: "text-teal-400" },
+  default: { command: "text-foreground", desk: "text-teal font-extrabold" },
+  icon: { command: "text-foreground", desk: "text-teal font-extrabold" },
+  white: { command: "text-white", desk: "text-teal-300 font-extrabold" },
+  black: { command: "text-foreground", desk: "text-teal font-extrabold" },
+  gradient: { command: "text-foreground", desk: "text-teal font-extrabold" },
+  dark: { command: "text-white", desk: "text-teal-400 font-extrabold" },
 };
 
 export function CommandDeskLogo({
@@ -67,7 +67,7 @@ export function CommandDeskLogo({
             className={cn(
               "font-medium uppercase tracking-wider",
               dimensions.tagline,
-              variant === "white" || variant === "dark" ? "text-white/60" : "text-navy-400",
+              variant === "white" || variant === "dark" ? "text-white/70" : "text-muted-foreground",
             )}
           >
             Manage &bull; Monitor &bull; Grow

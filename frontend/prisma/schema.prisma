@@ -11,6 +11,7 @@ datasource db {
 enum UserRole {
   SUPER_ADMIN
   ORGANIZATION_OWNER
+  ADMIN
   HR
   MANAGER
   TEAM_LEAD
@@ -81,100 +82,128 @@ enum ProjectStatus {
   CANCELLED
 }
 
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  PAUSED
+}
+
 // ========== CORE MODELS ==========
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  passwordHash  String?
-  firstName     String
-  lastName      String
-  phone         String?
-  avatarUrl     String?
-  role          UserRole @default(EMPLOYEE)
-  isActive      Boolean  @default(true)
-  emailVerified DateTime?
-  twoFactorEnabled Boolean @default(false)
-  twoFactorSecret String?
-  lastLoginAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String    @id @default(cuid())
+  authUserId       String?   @unique
+  email            String    @unique
+  passwordHash     String?
+  firstName        String
+  lastName         String
+  phone            String?
+  avatarUrl        String?
+  role             UserRole  @default(EMPLOYEE)
+  isActive         Boolean   @default(true)
+  emailVerified    DateTime?
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret  String?
+  lastLoginAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  company       Company?  @relation(fields: [companyId], references: [id])
-  companyId     String?
-  department    Department? @relation(fields: [departmentId], references: [id])
-  departmentId  String?
-  manager       User?     @relation("ManagerEmployee", fields: [managerId], references: [id])
-  managerId     String?
-  employees     User[]    @relation("ManagerEmployee")
+  company            Company?     @relation(fields: [companyId], references: [id])
+  companyId          String?
+  department         Department?  @relation(fields: [departmentId], references: [id])
+  departmentId       String?
+  manager            User?        @relation("ManagerEmployee", fields: [managerId], references: [id])
+  managerId          String?
+  employees          User[]       @relation("ManagerEmployee")
   managedDepartments Department[] @relation("DepartmentHead")
 
-  sessions      Session[]
-  accounts      Account[]
-  employeeProfile EmployeeProfile?
-  attendance    Attendance[]
-  leaves        Leave[]
-  tasks         Task[]
-  taskComments  TaskComment[]
-  projects      Project[]
-  notifications Notification[]
-  messages      Message[]
+  sessions         Session[]
+  accounts         Account[]
+  employeeProfile  EmployeeProfile?
+  attendance       Attendance[]
+  leaves           Leave[]
+  tasks            Task[]
+  taskComments     TaskComment[]
+  projects         Project[]
+  notifications    Notification[]
+  messages         Message[]
   chatParticipants ChatParticipant[]
-  documents     Document[]
-  timeEntries   TimeEntry[]
-  payroll       Payroll[]
-  assets        Asset[]
-  promotions    Promotion[]
-  loginHistory  LoginHistory[]
-  createdTickets  Ticket[] @relation("TicketCreator")
-  assignedTickets Ticket[] @relation("TicketAssignee")
-  ticketComments  TicketComment[]
-  createdReports  AnalyticsReport[]
+  documents        Document[]
+  timeEntries      TimeEntry[]
+  payroll          Payroll[]
+  assets           Asset[]
+  promotions       Promotion[]
+  loginHistory     LoginHistory[]
+  createdTickets   Ticket[]            @relation("TicketCreator")
+  assignedTickets  Ticket[]            @relation("TicketAssignee")
+  ticketComments   TicketComment[]
+  createdReports   AnalyticsReport[]
+  memberships      CompanyMembership[]
+  auditEvents      AuditLog[]          @relation("AuditActor")
+  apiKeysCreated   ApiKey[]            @relation("ApiKeyCreator")
 }
 
 model Company {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  logoUrl          String?
+  website          String?
+  industry         String?
+  gst              String?
+  address          String?
+  email            String?
+  phone            String?
+  brandColor       String   @default("#4338CA")
+  timezone         String   @default("Asia/Kolkata")
+  country          String   @default("India")
+  subscriptionPlan String   @default("free")
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  users         User[]
+  departments   Department[]
+  projects      Project[]
+  clients       Client[]
+  leads         Lead[]
+  invoices      Invoice[]
+  expenses      Expense[]
+  vendors       Vendor[]
+  tickets       Ticket[]
+  reports       AnalyticsReport[]
+  memberships   CompanyMembership[]
+  customRoles   CustomRole[]
+  subscription  Subscription?
+  usageRecords  UsageRecord[]
+  apiKeys       ApiKey[]
+  customDomains CustomDomain[]
+  branding      BrandingSettings?
+  auditLogs     AuditLog[]
+}
+
+model Department {
   id          String   @id @default(cuid())
   name        String
-  slug        String   @unique
-  logoUrl     String?
-  website     String?
-  gst         String?
-  address     String?
-  email       String?
-  phone       String?
-  brandColor  String   @default("#4338CA")
-  timezone    String   @default("Asia/Kolkata")
-  country     String   @default("India")
-  subscriptionPlan String @default("free")
+  code        String?
+  description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users       User[]
-  departments Department[]
-  projects    Project[]
-  clients     Client[]
-  leads       Lead[]
-  invoices    Invoice[]
-  expenses    Expense[]
-  vendors     Vendor[]
-  tickets     Ticket[]
-  reports     AnalyticsReport[]
-}
-
-model Department {
-  id        String   @id @default(cuid())
-  name      String
-  code      String?
-  description String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  company   Company  @relation(fields: [companyId], references: [id])
+  company   Company @relation(fields: [companyId], references: [id])
   companyId String
   users     User[]
-  head      User?    @relation("DepartmentHead", fields: [headId], references: [id])
+  head      User?   @relation("DepartmentHead", fields: [headId], references: [id])
   headId    String?
 }
 
@@ -217,218 +246,218 @@ model VerificationToken {
 // ========== EMPLOYEE MODELS ==========
 
 model EmployeeProfile {
-  id            String   @id @default(cuid())
-  employeeId    String   @unique
-  designation   String?
-  joiningDate   DateTime?
-  exitDate      DateTime?
-  employmentType String? @default("FULL_TIME")
-  workMode      String?  @default("OFFICE")
-  baseSalary    Float?
-  bankAccount   String?
-  ifscCode      String?
-  panNumber     String?
-  aadhaarNumber String?
-  uanNumber     String?
-  pfNumber      String?
-  esiNumber     String?
+  id               String    @id @default(cuid())
+  employeeId       String    @unique
+  designation      String?
+  joiningDate      DateTime?
+  exitDate         DateTime?
+  employmentType   String?   @default("FULL_TIME")
+  workMode         String?   @default("OFFICE")
+  baseSalary       Float?
+  bankAccount      String?
+  ifscCode         String?
+  panNumber        String?
+  aadhaarNumber    String?
+  uanNumber        String?
+  pfNumber         String?
+  esiNumber        String?
   emergencyContact String?
-  emergencyPhone  String?
-  bloodGroup    String?
-  dateOfBirth   DateTime?
-  gender        String?
-  maritalStatus String?
-  nationality   String?  @default("Indian")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  emergencyPhone   String?
+  bloodGroup       String?
+  dateOfBirth      DateTime?
+  gender           String?
+  maritalStatus    String?
+  nationality      String?   @default("Indian")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String   @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
 }
 
 model Attendance {
-  id          String           @id @default(cuid())
-  date        DateTime
-  clockIn     DateTime?
-  clockOut    DateTime?
-  status      AttendanceStatus @default(PRESENT)
-  lateMinutes Int              @default(0)
-  overtimeMinutes Int          @default(0)
-  workHours   Float?
-  breakMinutes Int             @default(0)
-  ipAddress   String?
-  location    String?
-  note        String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id              String           @id @default(cuid())
+  date            DateTime
+  clockIn         DateTime?
+  clockOut        DateTime?
+  status          AttendanceStatus @default(PRESENT)
+  lateMinutes     Int              @default(0)
+  overtimeMinutes Int              @default(0)
+  workHours       Float?
+  breakMinutes    Int              @default(0)
+  ipAddress       String?
+  location        String?
+  note            String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 
   @@unique([userId, date])
 }
 
 model TimeEntry {
-  id          String   @id @default(cuid())
-  startTime   DateTime
-  endTime     DateTime?
-  duration    Int?
-  description String?
-  isBillable  Boolean  @default(false)
-  isProductive Boolean @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String    @id @default(cuid())
+  startTime    DateTime
+  endTime      DateTime?
+  duration     Int?
+  description  String?
+  isBillable   Boolean   @default(false)
+  isProductive Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
-  task        Task?    @relation(fields: [taskId], references: [id])
-  taskId      String?
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  task   Task?   @relation(fields: [taskId], references: [id])
+  taskId String?
 }
 
 model Leave {
-  id          String       @id @default(cuid())
-  startDate   DateTime
-  endDate     DateTime
-  type        String
-  reason      String?
-  status      LeaveStatus  @default(PENDING)
-  approvedBy  String?
-  approvedAt  DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id         String      @id @default(cuid())
+  startDate  DateTime
+  endDate    DateTime
+  type       String
+  reason     String?
+  status     LeaveStatus @default(PENDING)
+  approvedBy String?
+  approvedAt DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 }
 
 model Payroll {
-  id            String   @id @default(cuid())
-  month         Int
-  year          Int
-  basicSalary   Float
-  hra           Float?
-  da            Float?
-  bonus         Float?
-  deductions    Float?
-  tax           Float?
-  pf            Float?
-  esi           Float?
-  netSalary     Float
-  paymentDate   DateTime?
-  paymentMode   String?
-  status        String   @default("PENDING")
-  remarks       String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String    @id @default(cuid())
+  month       Int
+  year        Int
+  basicSalary Float
+  hra         Float?
+  da          Float?
+  bonus       Float?
+  deductions  Float?
+  tax         Float?
+  pf          Float?
+  esi         Float?
+  netSalary   Float
+  paymentDate DateTime?
+  paymentMode String?
+  status      String    @default("PENDING")
+  remarks     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 }
 
 model Asset {
-  id          String   @id @default(cuid())
-  name        String
-  type        String
+  id           String    @id @default(cuid())
+  name         String
+  type         String
   serialNumber String?
-  model       String?
-  brand       String?
-  value       Float?
-  assignedAt  DateTime?
-  returnedAt  DateTime?
-  condition   String?
-  status      String   @default("ASSIGNED")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  model        String?
+  brand        String?
+  value        Float?
+  assignedAt   DateTime?
+  returnedAt   DateTime?
+  condition    String?
+  status       String    @default("ASSIGNED")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 }
 
 model Promotion {
-  id          String   @id @default(cuid())
+  id              String   @id @default(cuid())
   fromDesignation String
   toDesignation   String
-  fromSalary  Float?
-  toSalary    Float?
-  effectiveDate DateTime
-  reason      String?
-  approvedBy  String?
-  status      String   @default("APPROVED")
-  createdAt   DateTime @default(now())
+  fromSalary      Float?
+  toSalary        Float?
+  effectiveDate   DateTime
+  reason          String?
+  approvedBy      String?
+  status          String   @default("APPROVED")
+  createdAt       DateTime @default(now())
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 }
 
 // ========== PROJECT & TASK MODELS ==========
 
 model Project {
-  id          String        @id @default(cuid())
-  name        String
-  description String?
-  code        String?
-  status      ProjectStatus @default(PLANNING)
-  priority    TaskPriority? @default(MEDIUM)
-  startDate   DateTime?
-  endDate     DateTime?
-  budget      Float?
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  code           String?
+  status         ProjectStatus @default(PLANNING)
+  priority       TaskPriority? @default(MEDIUM)
+  startDate      DateTime?
+  endDate        DateTime?
+  budget         Float?
   estimatedHours Float?
-  actualHours Float?
-  color       String?
-  isBillable  Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  actualHours    Float?
+  color          String?
+  isBillable     Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  company     Company       @relation(fields: [companyId], references: [id])
-  companyId   String
-  lead        User          @relation(fields: [leadId], references: [id])
-  leadId      String
-  tasks       Task[]
-  milestones  Milestone[]
+  company    Company     @relation(fields: [companyId], references: [id])
+  companyId  String
+  lead       User        @relation(fields: [leadId], references: [id])
+  leadId     String
+  tasks      Task[]
+  milestones Milestone[]
 }
 
 model Milestone {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   description String?
   dueDate     DateTime?
   completedAt DateTime?
-  status      String   @default("PENDING")
-  createdAt   DateTime @default(now())
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
 
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId   String
-  tasks       Task[]
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  tasks     Task[]
 }
 
 model Task {
-  id            String     @id @default(cuid())
-  title         String
-  description   String?
-  status        TaskStatus @default(TODO)
-  priority      TaskPriority @default(MEDIUM)
-  estimatedHours Float?
-  spentHours    Float?
-  startDate     DateTime?
-  dueDate       DateTime?
-  completedAt   DateTime?
-  isRecurring   Boolean    @default(false)
+  id                String       @id @default(cuid())
+  title             String
+  description       String?
+  status            TaskStatus   @default(TODO)
+  priority          TaskPriority @default(MEDIUM)
+  estimatedHours    Float?
+  spentHours        Float?
+  startDate         DateTime?
+  dueDate           DateTime?
+  completedAt       DateTime?
+  isRecurring       Boolean      @default(false)
   recurringInterval String?
-  orderIndex    Int        @default(0)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  orderIndex        Int          @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  project       Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId     String?
-  milestone     Milestone? @relation(fields: [milestoneId], references: [id])
-  milestoneId   String?
-  assignee      User?      @relation(fields: [assigneeId], references: [id])
-  assigneeId    String?
-  parentTask    Task?      @relation("SubTasks", fields: [parentTaskId], references: [id])
-  parentTaskId  String?
-  subtasks      Task[]     @relation("SubTasks")
-  comments      TaskComment[]
-  timeEntries   TimeEntry[]
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId    String?
+  milestone    Milestone?    @relation(fields: [milestoneId], references: [id])
+  milestoneId  String?
+  assignee     User?         @relation(fields: [assigneeId], references: [id])
+  assigneeId   String?
+  parentTask   Task?         @relation("SubTasks", fields: [parentTaskId], references: [id])
+  parentTaskId String?
+  subtasks     Task[]        @relation("SubTasks")
+  comments     TaskComment[]
+  timeEntries  TimeEntry[]
 }
 
 model TaskComment {
@@ -437,33 +466,33 @@ model TaskComment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  taskId    String
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  String
+  task     Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId   String
+  author   User   @relation(fields: [authorId], references: [id])
+  authorId String
 }
 
 // ========== CRM MODELS ==========
 
 model Client {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
   companyName String?
-  website   String?
-  address   String?
-  city      String?
-  state     String?
-  country   String?
-  pincode   String?
-  gst       String?
-  notes     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  website     String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  pincode     String?
+  gst         String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  company   Company  @relation(fields: [companyId], references: [id])
+  company   Company   @relation(fields: [companyId], references: [id])
   companyId String
   leads     Lead[]
   invoices  Invoice[]
@@ -484,10 +513,10 @@ model Lead {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  company     Company    @relation(fields: [companyId], references: [id])
-  companyId   String
-  client      Client?    @relation(fields: [clientId], references: [id])
-  clientId    String?
+  company   Company @relation(fields: [companyId], references: [id])
+  companyId String
+  client    Client? @relation(fields: [clientId], references: [id])
+  clientId  String?
 }
 
 // ========== FINANCE MODELS ==========
@@ -505,10 +534,10 @@ model Invoice {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  company       Company       @relation(fields: [companyId], references: [id])
-  companyId     String
-  client        Client?       @relation(fields: [clientId], references: [id])
-  clientId      String?
+  company   Company @relation(fields: [companyId], references: [id])
+  companyId String
+  client    Client? @relation(fields: [clientId], references: [id])
+  clientId  String?
 }
 
 model Expense {
@@ -523,25 +552,25 @@ model Expense {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  company     Company  @relation(fields: [companyId], references: [id])
-  companyId   String
-  vendor      Vendor?  @relation(fields: [vendorId], references: [id])
-  vendorId    String?
+  company   Company @relation(fields: [companyId], references: [id])
+  companyId String
+  vendor    Vendor? @relation(fields: [vendorId], references: [id])
+  vendorId  String?
 }
 
 model Vendor {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  address   String?
-  gst       String?
+  id           String   @id @default(cuid())
+  name         String
+  email        String?
+  phone        String?
+  address      String?
+  gst          String?
   paymentTerms String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  company   Company  @relation(fields: [companyId], references: [id])
+  company   Company   @relation(fields: [companyId], references: [id])
   companyId String
   expenses  Expense[]
 }
@@ -556,32 +585,32 @@ model Message {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sender    User     @relation(fields: [senderId], references: [id])
-  senderId  String
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId    String
+  sender   User   @relation(fields: [senderId], references: [id])
+  senderId String
+  chat     Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId   String
 }
 
 model Chat {
-  id          String   @id @default(cuid())
-  name        String?
-  isGroup     Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String?
+  isGroup   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  messages    Message[]
+  messages     Message[]
   participants ChatParticipant[]
 }
 
 model ChatParticipant {
-  id        String   @id @default(cuid())
-  joinedAt  DateTime @default(now())
-  role      String   @default("MEMBER")
+  id       String   @id @default(cuid())
+  joinedAt DateTime @default(now())
+  role     String   @default("MEMBER")
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId    String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
 
   @@unique([userId, chatId])
 }
@@ -600,36 +629,36 @@ model Document {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  uploader    User     @relation(fields: [uploaderId], references: [id])
-  uploaderId  String
+  uploader   User   @relation(fields: [uploaderId], references: [id])
+  uploaderId String
 }
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   title     String
   message   String
-  type      String   @default("INFO")
+  type      String    @default("INFO")
   link      String?
-  isRead    Boolean  @default(false)
+  isRead    Boolean   @default(false)
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 }
 
 model LoginHistory {
-  id        String   @id @default(cuid())
-  ipAddress String?
-  userAgent String?
-  device    String?
-  location  String?
-  loginAt   DateTime @default(now())
-  isSuccess Boolean  @default(true)
+  id         String   @id @default(cuid())
+  ipAddress  String?
+  userAgent  String?
+  device     String?
+  location   String?
+  loginAt    DateTime @default(now())
+  isSuccess  Boolean  @default(true)
   failReason String?
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 }
 
 // ========== SUPPORT MODELS ==========
@@ -643,27 +672,27 @@ model Ticket {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  company     Company  @relation(fields: [companyId], references: [id])
-  companyId   String
-  createdBy   User     @relation("TicketCreator", fields: [createdById], references: [id])
-  createdById String
-  assignedTo  User?    @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  company      Company @relation(fields: [companyId], references: [id])
+  companyId    String
+  createdBy    User    @relation("TicketCreator", fields: [createdById], references: [id])
+  createdById  String
+  assignedTo   User?   @relation("TicketAssignee", fields: [assignedToId], references: [id])
   assignedToId String?
-  
-  comments    TicketComment[]
+
+  comments TicketComment[]
 }
 
 model TicketComment {
-  id        String   @id @default(cuid())
-  content   String
-  isInternal Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  content    String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  ticketId  String
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId String
+  author   User   @relation(fields: [authorId], references: [id])
+  authorId String
 }
 
 // ========== ANALYTICS MODELS ==========
@@ -676,8 +705,151 @@ model AnalyticsReport {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  company     Company  @relation(fields: [companyId], references: [id])
+  company     Company @relation(fields: [companyId], references: [id])
   companyId   String
-  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdBy   User    @relation(fields: [createdById], references: [id])
   createdById String
+}
+
+model CompanyMembership {
+  id           String           @id @default(cuid())
+  companyId    String
+  userId       String
+  role         String           @default("EMPLOYEE")
+  customRoleId String?
+  status       MembershipStatus @default(ACTIVE)
+  isDefault    Boolean          @default(false)
+  invitedAt    DateTime?
+  joinedAt     DateTime?        @default(now())
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customRole CustomRole? @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, userId])
+  @@index([userId, status])
+  @@index([companyId, role])
+}
+
+model CustomRole {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  slug        String
+  description String?
+  permissions String[]
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  memberships CompanyMembership[]
+
+  @@unique([companyId, slug])
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  companyId          String             @unique
+  plan               String             @default("FREE")
+  status             SubscriptionStatus @default(TRIALING)
+  providerCustomerId String?
+  providerPlanId     String?
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model UsageRecord {
+  id          String   @id @default(cuid())
+  companyId   String
+  metric      String
+  quantity    Int      @default(0)
+  periodStart DateTime
+  periodEnd   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, metric, periodStart])
+  @@index([companyId, periodEnd])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  companyId   String
+  createdById String
+  name        String
+  keyPrefix   String
+  keyHash     String    @unique
+  scopes      String[]
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("ApiKeyCreator", fields: [createdById], references: [id])
+
+  @@index([companyId, revokedAt])
+}
+
+model CustomDomain {
+  id           String    @id @default(cuid())
+  companyId    String
+  hostname     String    @unique
+  status       String    @default("PENDING")
+  verification String?
+  sslStatus    String    @default("PENDING")
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+}
+
+model BrandingSettings {
+  id              String   @id @default(cuid())
+  companyId       String   @unique
+  productName     String?
+  logoUrl         String?
+  iconUrl         String?
+  primaryColor    String   @default("#0F766E")
+  secondaryColor  String   @default("#0F172A")
+  customCss       String?
+  supportEmail    String?
+  hideCommandDesk Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  companyId  String
+  actorId    String?
+  action     String
+  resource   String
+  resourceId String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  actor   User?   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([resource, resourceId])
 }

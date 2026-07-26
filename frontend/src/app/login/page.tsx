@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 import { CommandDeskLogo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -9,8 +9,10 @@ import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -19,19 +21,55 @@ export default function LoginPage() {
     setIsLoading(true);
     setError("");
     try {
-      const result = await signIn("credentials", { email, password, redirect: false });
-      if (result?.error) { setError("Invalid email or password"); setIsLoading(false); return; }
-      router.push("/");
-      router.refresh();
-    } catch {
-      setError("An error occurred.");
+      if (mode === "sign-up") {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+        if (signUpError) throw signUpError;
+        setError("Check your email to confirm your account.");
+        setMode("sign-in");
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) throw signInError;
+        router.push("/");
+        router.refresh();
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to authenticate.");
       setIsLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    await signIn("google", { callbackUrl: "/" });
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (oauthError) {
+      setError(oauthError.message);
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email) {
+      setError("Enter your email address first.");
+      return;
+    }
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
+    });
+    setError(resetError?.message ?? "Password reset email sent.");
   };
 
   return (
@@ -62,8 +100,14 @@ export default function LoginPage() {
           <div className="lg:hidden flex justify-center mb-8">
             <CommandDeskLogo size="lg" />
           </div>
-          <h1 className="text-3xl font-heading font-bold text-foreground mb-2">Welcome back</h1>
-          <p className="text-muted-foreground mb-8">Sign in to your CommandDesk account</p>
+          <h1 className="text-3xl font-heading font-bold text-foreground mb-2">
+            {mode === "sign-in" ? "Welcome back" : "Create your account"}
+          </h1>
+          <p className="text-muted-foreground mb-8">
+            {mode === "sign-in"
+              ? "Sign in to your CommandDesk workspace"
+              : "Start with secure email authentication"}
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
@@ -102,7 +146,7 @@ export default function LoginPage() {
                 <input type="checkbox" className="w-4 h-4 rounded accent-primary" />
                 <span className="text-sm text-muted-foreground">Remember me</span>
               </label>
-              <button type="button" className="text-sm text-primary hover:text-primary/80 font-medium">
+              <button type="button" onClick={handlePasswordReset} className="text-sm text-primary hover:text-primary/80 font-medium">
                 Forgot password?
               </button>
             </div>
@@ -110,7 +154,7 @@ export default function LoginPage() {
               {isLoading ? (
                 <><Loader2 className="animate-spin mr-2" size={18} />Signing in...</>
               ) : (
-                "Sign In"
+                mode === "sign-in" ? "Sign In" : "Create Account"
               )}
             </Button>
           </form>
@@ -135,9 +179,16 @@ export default function LoginPage() {
           </Button>
 
           <p className="text-center text-sm text-muted-foreground mt-4">
-            Don&apos;t have an account?{" "}
-            <button type="button" className="text-primary hover:text-primary/80 font-medium">
-              Contact your admin
+            {mode === "sign-in" ? "Don’t have an account?" : "Already have an account?"}{" "}
+            <button
+              type="button"
+              className="text-primary hover:text-primary/80 font-medium"
+              onClick={() => {
+                setMode(mode === "sign-in" ? "sign-up" : "sign-in");
+                setError("");
+              }}
+            >
+              {mode === "sign-in" ? "Create one" : "Sign in"}
             </button>
           </p>
         </motion.div>

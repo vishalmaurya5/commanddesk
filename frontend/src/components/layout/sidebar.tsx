@@ -21,60 +21,87 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { PERMISSIONS, type Permission } from "@/lib/saas/permissions";
 
 interface SidebarItem {
   label: string;
   icon: React.ReactNode;
   href: string;
   badge?: number;
+  permission?: Permission;
   children?: SidebarItem[];
 }
 
 const sidebarItems: SidebarItem[] = [
-  { label: "Dashboard", icon: <LayoutDashboard size={20} />, href: "/" },
+  { label: "Dashboard", icon: <LayoutDashboard size={20} />, href: "/", permission: PERMISSIONS.DASHBOARD_VIEW },
   {
     label: "Employees",
     icon: <Users size={20} />,
     href: "/employees",
+    permission: PERMISSIONS.EMPLOYEES_VIEW,
     children: [
-      { label: "All Employees", icon: <UserCircle size={18} />, href: "/employees" },
-      { label: "Departments", icon: <Building2 size={18} />, href: "/departments" },
-      { label: "Attendance", icon: <CalendarCheck size={18} />, href: "/attendance" },
-      { label: "Time Tracking", icon: <Clock size={18} />, href: "/time-tracking" },
+      { label: "All Employees", icon: <UserCircle size={18} />, href: "/employees", permission: PERMISSIONS.EMPLOYEES_VIEW },
+      { label: "Departments", icon: <Building2 size={18} />, href: "/departments", permission: PERMISSIONS.DEPARTMENTS_VIEW },
+      { label: "Attendance", icon: <CalendarCheck size={18} />, href: "/attendance", permission: PERMISSIONS.ATTENDANCE_SELF },
+      { label: "Time Tracking", icon: <Clock size={18} />, href: "/time-tracking", permission: PERMISSIONS.TIME_TRACKING_USE },
     ],
   },
-  { label: "HRMS", icon: <UserCircle size={20} />, href: "/hrms" },
-  { label: "Payroll", icon: <Receipt size={20} />, href: "/payroll" },
-  { label: "Projects", icon: <Briefcase size={20} />, href: "/projects" },
-  { label: "Tasks", icon: <CheckSquare size={20} />, href: "/tasks" },
-  { label: "CRM", icon: <Users size={20} />, href: "/crm" },
-  { label: "Finance", icon: <Receipt size={20} />, href: "/finance" },
-  { label: "Support", icon: <MessageSquare size={20} />, href: "/support" },
-  { label: "Documents", icon: <FileText size={20} />, href: "/documents" },
-  { label: "Websites", icon: <Globe size={20} />, href: "/websites" },
-  { label: "AI Assistant", icon: <Bot size={20} />, href: "/ai", badge: 3 },
-  { label: "Analytics", icon: <BarChart3 size={20} />, href: "/analytics" },
+  { label: "HRMS", icon: <UserCircle size={20} />, href: "/hrms", permission: PERMISSIONS.HRMS_VIEW },
+  { label: "Payroll", icon: <Receipt size={20} />, href: "/payroll", permission: PERMISSIONS.PAYROLL_SELF },
+  { label: "Projects", icon: <Briefcase size={20} />, href: "/projects", permission: PERMISSIONS.PROJECTS_VIEW },
+  { label: "Tasks", icon: <CheckSquare size={20} />, href: "/tasks", permission: PERMISSIONS.TASKS_VIEW },
+  { label: "CRM", icon: <Users size={20} />, href: "/crm", permission: PERMISSIONS.CRM_VIEW },
+  { label: "Finance", icon: <Receipt size={20} />, href: "/finance", permission: PERMISSIONS.FINANCE_VIEW },
+  { label: "Support", icon: <MessageSquare size={20} />, href: "/support", permission: PERMISSIONS.SUPPORT_VIEW },
+  { label: "Documents", icon: <FileText size={20} />, href: "/documents", permission: PERMISSIONS.DOCUMENTS_VIEW },
+  { label: "Websites", icon: <Globe size={20} />, href: "/websites", permission: PERMISSIONS.WEBSITES_VIEW },
+  { label: "AI Assistant", icon: <Bot size={20} />, href: "/ai", badge: 3, permission: PERMISSIONS.AI_USE },
+  { label: "Analytics", icon: <BarChart3 size={20} />, href: "/analytics", permission: PERMISSIONS.ANALYTICS_VIEW },
 ];
 
 const bottomItems: SidebarItem[] = [
-  { label: "Notifications", icon: <Bell size={20} />, href: "/notifications", badge: 12 },
-  { label: "Messages", icon: <MessageSquare size={20} />, href: "/messages", badge: 5 },
-  { label: "Settings", icon: <Settings size={20} />, href: "/settings" },
+  { label: "Notifications", icon: <Bell size={20} />, href: "/notifications", badge: 12, permission: PERMISSIONS.NOTIFICATIONS_VIEW },
+  { label: "Messages", icon: <MessageSquare size={20} />, href: "/messages", badge: 5, permission: PERMISSIONS.MESSAGES_USE },
+  { label: "Settings", icon: <Settings size={20} />, href: "/settings", permission: PERMISSIONS.SETTINGS_SELF },
 ];
 
 interface SidebarProps {
   className?: string;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["Employees"]);
+  const [permissions, setPermissions] = useState<Set<string> | null>(null);
   const pathname = usePathname();
+
+  useEffect(() => {
+    fetch("/api/access")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data?.permissions) setPermissions(new Set(data.permissions));
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const canView = (item: SidebarItem) =>
+    !permissions || !item.permission || permissions.has(item.permission);
+
+  const visibleSidebarItems = sidebarItems
+    .filter(canView)
+    .map((item) => ({
+      ...item,
+      children: item.children?.filter(canView),
+    }));
+  const visibleBottomItems = bottomItems.filter(canView);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
@@ -88,178 +115,188 @@ export function Sidebar({ className }: SidebarProps) {
   };
 
   return (
-    <motion.aside
-      initial={{ x: -20, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className={cn(
-        "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-card transition-all duration-300",
-        collapsed ? "w-[72px]" : "w-[260px]",
-        className
+    <>
+      {/* Mobile Backdrop Mask */}
+      {mobileOpen && (
+        <div
+          onClick={onMobileClose}
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity"
+        />
       )}
-    >
-      {/* Logo Section */}
-      <div className={cn(
-        "flex h-16 items-center border-b border-border px-4",
-        collapsed ? "justify-center" : "justify-between"
-      )}>
-        {!collapsed && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex items-center gap-2"
-          >
-            <CommandDeskIcon size="sm" />
-            <span className="font-heading text-lg font-bold">
-              <span className="text-navy-900 dark:text-white">Command</span>
-              <span className="text-teal">Desk</span>
-            </span>
-          </motion.div>
-        )}
-        {collapsed && <CommandDeskIcon size="sm" />}
-      </div>
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
-        <nav className="space-y-1">
-          {sidebarItems.map((item) => (
-            <div key={item.label}>
-              {item.children ? (
-              <button
-                onClick={() => {
-                  toggleMenu(item.label);
-                }}
-                className={cn(
-                  "sidebar-item w-full",
-                  isActive(item.href) && "active",
-                  collapsed && "justify-center px-0"
-                )}
-                title={collapsed ? item.label : undefined}
-              >
-                <span className="flex-shrink-0">{item.icon}</span>
-                {!collapsed && (
-                  <>
-                    <span className="flex-1 text-left">{item.label}</span>
-                    {item.badge && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
-                        {item.badge}
-                      </span>
+      <aside
+        className={cn(
+          "fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-border bg-card shadow-lg lg:shadow-none transition-all duration-300",
+          collapsed ? "lg:w-[72px]" : "lg:w-[260px]",
+          "w-[260px]",
+          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          className
+        )}
+      >
+        {/* Logo Header */}
+        <div
+          className={cn(
+            "flex h-16 items-center border-b border-border px-4",
+            collapsed ? "lg:justify-center justify-between" : "justify-between"
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <CommandDeskIcon size="sm" />
+            {(!collapsed || mobileOpen) && (
+              <span className="font-heading text-lg font-bold tracking-tight">
+                <span className="text-foreground">Command</span>
+                <span className="text-teal font-extrabold">Desk</span>
+              </span>
+            )}
+          </div>
+
+          {/* Close button on mobile */}
+          <button
+            onClick={onMobileClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted lg:hidden"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Main Navigation Scroll Area */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
+          <nav className="space-y-1">
+            {visibleSidebarItems.map((item) => (
+              <div key={item.label}>
+                {item.children ? (
+                  <button
+                    onClick={() => toggleMenu(item.label)}
+                    className={cn(
+                      "sidebar-item w-full",
+                      isActive(item.href) && "active",
+                      collapsed && "lg:justify-center lg:px-0"
                     )}
-                    {item.children && (
-                      <ChevronRight
-                        size={14}
-                        className={cn(
-                          "transition-transform duration-200",
-                          expandedMenus.includes(item.label) && "rotate-90"
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <span className="flex-shrink-0">{item.icon}</span>
+                    {(!collapsed || mobileOpen) && (
+                      <>
+                        <span className="flex-1 text-left">{item.label}</span>
+                        {item.badge && (
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                            {item.badge}
+                          </span>
                         )}
-                      />
+                        <ChevronRight
+                          size={14}
+                          className={cn(
+                            "transition-transform duration-200",
+                            expandedMenus.includes(item.label) && "rotate-90"
+                          )}
+                        />
+                      </>
                     )}
-                  </>
+                  </button>
+                ) : (
+                  <Link
+                    href={item.href}
+                    onClick={onMobileClose}
+                    className={cn(
+                      "sidebar-item w-full",
+                      isActive(item.href) && "active",
+                      collapsed && "lg:justify-center lg:px-0"
+                    )}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <span className="flex-shrink-0">{item.icon}</span>
+                    {(!collapsed || mobileOpen) && (
+                      <>
+                        <span className="flex-1 text-left">{item.label}</span>
+                        {item.badge && (
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                            {item.badge}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </Link>
                 )}
-              </button>
-              ) : (
+
+                {/* Submenu */}
+                <AnimatePresence>
+                  {item.children && expandedMenus.includes(item.label) && (!collapsed || mobileOpen) && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="ml-4 mt-1 space-y-1 border-l-2 border-border pl-3">
+                        {item.children.map((child) => (
+                          <Link
+                            key={child.label}
+                            href={child.href}
+                            onClick={onMobileClose}
+                            className={cn(
+                              "sidebar-item w-full text-xs font-medium",
+                              isActive(child.href) && "active"
+                            )}
+                          >
+                            {child.icon}
+                            <span>{child.label}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+          </nav>
+        </div>
+
+        {/* Bottom Utility Items */}
+        <div className="border-t border-border px-3 py-3">
+          <nav className="space-y-1">
+            {visibleBottomItems.map((item) => (
               <Link
+                key={item.label}
                 href={item.href}
+                onClick={onMobileClose}
                 className={cn(
                   "sidebar-item w-full",
                   isActive(item.href) && "active",
-                  collapsed && "justify-center px-0"
+                  collapsed && "lg:justify-center lg:px-0"
                 )}
                 title={collapsed ? item.label : undefined}
               >
-                <span className="flex-shrink-0">{item.icon}</span>
-                {!collapsed && (
+                <span className="relative flex-shrink-0">
+                  {item.icon}
+                  {item.badge && collapsed && (
+                    <span className="absolute -right-1 -top-1 flex h-3 w-3 rounded-full bg-danger" />
+                  )}
+                </span>
+                {(!collapsed || mobileOpen) && (
                   <>
                     <span className="flex-1 text-left">{item.label}</span>
                     {item.badge && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-[10px] font-semibold text-white">
                         {item.badge}
                       </span>
                     )}
                   </>
                 )}
               </Link>
-              )}
+            ))}
+          </nav>
+        </div>
 
-              {/* Submenu */}
-              <AnimatePresence>
-                {item.children && expandedMenus.includes(item.label) && !collapsed && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2, ease: "easeInOut" }}
-                    className="overflow-hidden"
-                  >
-                    <div className="ml-4 mt-1 space-y-1 border-l-2 border-border pl-3">
-                      {item.children.map((child) => (
-                        <Link
-                          key={child.label}
-                          href={child.href}
-                          className={cn(
-                            "sidebar-item w-full text-sm",
-                            isActive(child.href) && "active",
-                            collapsed && "justify-center px-0"
-                          )}
-                        >
-                          {child.icon}
-                          <span>{child.label}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          ))}
-        </nav>
-      </div>
-
-      {/* Bottom Items */}
-      <div className="border-t border-border px-3 py-3">
-        <nav className="space-y-1">
-          {bottomItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={cn(
-                "sidebar-item w-full",
-                isActive(item.href) && "active",
-                collapsed && "justify-center px-0"
-              )}
-              title={collapsed ? item.label : undefined}
-            >
-              <span className="relative flex-shrink-0">
-                {item.icon}
-                {item.badge && (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white">
-                    {item.badge}
-                  </span>
-                )}
-              </span>
-              {!collapsed && (
-                <>
-                  <span className="flex-1 text-left">{item.label}</span>
-                  {item.badge && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-[10px] font-semibold text-white">
-                      {item.badge}
-                    </span>
-                  )}
-                </>
-              )}
-            </Link>
-          ))}
-        </nav>
-      </div>
-
-      {/* Collapse Button */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="flex h-10 items-center justify-center border-t border-border text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-      </button>
-    </motion.aside>
+        {/* Desktop Collapse Toggle */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="hidden lg:flex h-10 items-center justify-center border-t border-border text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Collapse sidebar"
+        >
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
+      </aside>
+    </>
   );
 }
