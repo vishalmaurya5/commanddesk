@@ -1,102 +1,33 @@
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
-import { CrmService } from "@/lib/services/crm-service";
-import { Button } from "@/components/ui/button";
-import { Plus, Search } from "lucide-react";
+"use client";
+import { FormEvent, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Eye, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import Link from "next/link";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { DashboardLayout } from "@/components/layout/dashboard-layout";
+import { apiClient } from "@/lib/api-client";
 
-export default async function ClientsPage() {
-  const session = await auth();
-  const companyId = (session?.user as any)?.companyId;
-  if (!companyId) redirect("/login");
-
-  const clients = await CrmService.getClients(companyId);
-
-  return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <Header />
-        <main className="flex-1 flex flex-col p-6 overflow-hidden">
-          <div className="max-w-7xl mx-auto w-full space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">Clients</h1>
-                <p className="text-slate-500">Manage your active customers and organizations.</p>
-              </div>
-              <Button className="bg-teal-600 hover:bg-teal-700">
-                <Plus className="mr-2 h-4 w-4" /> Add Client
-              </Button>
-            </div>
-
-            <div className="bg-white rounded-lg border shadow-sm flex-1 overflow-hidden flex flex-col">
-              <div className="p-4 border-b flex justify-between items-center bg-slate-50/50">
-                <div className="relative w-72">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-                  <Input placeholder="Search clients..." className="pl-9" />
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50 sticky top-0">
-                    <TableRow>
-                      <TableHead>Client Name</TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {clients.map((client) => (
-                      <TableRow key={client.id}>
-                        <TableCell className="font-medium text-slate-900">{client.name}</TableCell>
-                        <TableCell className="text-slate-500">{client.companyName || "—"}</TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <div className="text-slate-900">{client.email}</div>
-                            <div className="text-slate-500">{client.phone}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={client.isActive ? "default" : "secondary"}>
-                            {client.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/clients/${client.id}`}>View Profile</Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {clients.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-slate-500">
-                          No clients found. Start by converting a lead!
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
+type Client = { id: string; name: string; email?: string | null; phone?: string | null; companyName?: string | null; website?: string | null; address?: string | null; city?: string | null; state?: string | null; country?: string | null; pincode?: string | null; gst?: string | null; notes?: string | null; isActive: boolean; _count?: { leads: number; invoices: number } };
+const empty = { name: "", email: "", phone: "", companyName: "", website: "", address: "", city: "", state: "", country: "", pincode: "", gst: "", notes: "" };
+export default function ClientsPage() {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("ACTIVE");
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState("");
+  const [form, setForm] = useState(empty);
+  const query = useQuery<Client[]>({ queryKey: ["clients"], queryFn: () => apiClient.get("/clients?includeInactive=true").then((response) => response.data) });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["clients"] });
+  const save = useMutation({ mutationFn: () => editingId ? apiClient.patch(`/clients/${editingId}`, form) : apiClient.post("/clients", form), onSuccess: () => { refresh(); close(); } });
+  const deactivate = useMutation({ mutationFn: (id: string) => apiClient.delete(`/clients/${id}`), onSuccess: refresh });
+  const reactivate = useMutation({ mutationFn: (id: string) => apiClient.patch(`/clients/${id}`, { isActive: true }), onSuccess: refresh });
+  const clients = useMemo(() => (query.data ?? []).filter((item) => (status === "ALL" || (status === "ACTIVE" ? item.isActive : !item.isActive)) && (!search.trim() || `${item.name} ${item.companyName ?? ""} ${item.email ?? ""} ${item.phone ?? ""}`.toLowerCase().includes(search.toLowerCase()))), [query.data, search, status]);
+  function close() { setShowForm(false); setEditingId(""); setForm(empty); }
+  function edit(item: Client) { setEditingId(item.id); setForm({ name: item.name, email: item.email ?? "", phone: item.phone ?? "", companyName: item.companyName ?? "", website: item.website ?? "", address: item.address ?? "", city: item.city ?? "", state: item.state ?? "", country: item.country ?? "", pincode: item.pincode ?? "", gst: item.gst ?? "", notes: item.notes ?? "" }); setShowForm(true); }
+  function submit(event: FormEvent) { event.preventDefault(); save.mutate(); }
+  return <DashboardLayout><div className="space-y-6">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-3xl font-bold">Clients</h1><p className="text-muted-foreground">Manage customers, organizations and their contact details.</p></div><button onClick={() => { close(); setShowForm(true); }} className="flex items-center gap-2 rounded-xl bg-teal px-5 py-2.5 font-semibold text-white"><Plus className="h-4 w-4" /> Add Client</button></div>
+    {showForm && <form onSubmit={submit} className="rounded-2xl border bg-card p-5 shadow-sm"><div className="mb-4 flex justify-between"><h2 className="font-semibold">{editingId ? "Edit client" : "Add client"}</h2><button type="button" onClick={close}><X className="h-5 w-5" /></button></div><div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{([["name","Client name",true],["companyName","Company",false],["email","Email",false],["phone","Phone",false],["website","Website",false],["gst","GST / Tax ID",false],["address","Address",false],["city","City",false],["state","State",false],["country","Country",false],["pincode","Postal code",false]] as const).map(([key,label,required]) => <label key={key} className="text-sm font-medium">{label}<input required={required} type={key === "email" ? "email" : key === "website" ? "url" : "text"} value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label>)}<label className="text-sm font-medium md:col-span-2 lg:col-span-3">Notes<textarea rows={3} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2" /></label></div>{save.error && <p className="mt-3 text-sm text-red-600">{save.error.message}</p>}<div className="mt-4 flex justify-end gap-3"><button type="button" onClick={close} className="rounded-xl border px-4 py-2">Cancel</button><button disabled={save.isPending} className="rounded-xl bg-teal px-5 py-2 font-semibold text-white disabled:opacity-50">{save.isPending ? "Saving..." : editingId ? "Update Client" : "Create Client"}</button></div></form>}
+    <div className="flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search clients..." className="w-full rounded-xl border py-2.5 pl-10 pr-3" /></div><select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-xl border px-4"><option value="ACTIVE">Active clients</option><option value="INACTIVE">Inactive clients</option><option value="ALL">All clients</option></select></div>
+    <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm">{query.isLoading ? <div className="p-12 text-center text-muted-foreground">Loading clients...</div> : query.error ? <div className="p-4 text-red-600">{query.error.message}</div> : <table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-4">Client</th><th>Company</th><th>Contact</th><th>CRM activity</th><th>Status</th><th className="pr-4 text-right">Actions</th></tr></thead><tbody>{clients.map((item) => <tr key={item.id} className="border-b last:border-0"><td className="p-4 font-semibold">{item.name}</td><td>{item.companyName || "—"}</td><td><div>{item.email || "—"}</div><div className="text-xs text-muted-foreground">{item.phone}</div></td><td className="text-xs text-muted-foreground">{item._count?.leads ?? 0} leads · {item._count?.invoices ?? 0} invoices</td><td><span className={`rounded-full px-2 py-1 text-xs ${item.isActive ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>{item.isActive ? "Active" : "Inactive"}</span></td><td><div className="flex justify-end gap-2 pr-4"><Link href={`/clients/${item.id}`} title="View"><Eye className="h-4 w-4" /></Link><button onClick={() => edit(item)} title="Edit"><Pencil className="h-4 w-4" /></button>{item.isActive ? <button onClick={() => window.confirm("Deactivate this client?") && deactivate.mutate(item.id)} title="Deactivate" className="hover:text-red-600"><Trash2 className="h-4 w-4" /></button> : <button onClick={() => reactivate.mutate(item.id)} className="text-xs font-semibold text-teal">Reactivate</button>}</div></td></tr>)}{clients.length === 0 && <tr><td colSpan={6} className="p-12 text-center text-muted-foreground">No matching clients. Use “Add Client” to create one.</td></tr>}</tbody></table>}</div>
+  </div></DashboardLayout>;
 }

@@ -1,41 +1,25 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { NotificationService } from "@/lib/services/notification-service";
+import { prisma } from "@/lib/prisma";
+import { authorize } from "@/lib/saas/authorize";
+import { apiError } from "@/lib/saas/api-error";
+import { PERMISSIONS } from "@/lib/saas/permissions";
 
-interface Params {
-  params: Promise<{ id: string }>;
+export async function PATCH(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { userId } = await authorize(PERMISSIONS.NOTIFICATIONS_VIEW);
+    const { id } = await params;
+    const result = await prisma.notification.updateMany({ where: { id, userId }, data: { isRead: true, readAt: new Date() } });
+    if (!result.count) return NextResponse.json({ error: "Notification not found" }, { status: 404 });
+    return NextResponse.json({ id, isRead: true });
+  } catch (error) { return apiError(error, "Unable to mark notification as read"); }
 }
 
-export async function PATCH(
-  _request: Request,
-  { params }: Params
-) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const notification = await NotificationService.markAsRead((await params).id);
-    return NextResponse.json(notification);
-  } catch (error) {
-    console.error("Error marking notification as read:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
-
-export async function DELETE(
-  _request: Request,
-  { params }: Params
-) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    await NotificationService.delete((await params).id);
-    return NextResponse.json({ message: "Notification deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting notification:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
+    const { userId } = await authorize(PERMISSIONS.NOTIFICATIONS_VIEW);
+    const { id } = await params;
+    const result = await prisma.notification.deleteMany({ where: { id, userId } });
+    if (!result.count) return NextResponse.json({ error: "Notification not found" }, { status: 404 });
+    return NextResponse.json({ message: "Notification deleted" });
+  } catch (error) { return apiError(error, "Unable to delete notification"); }
 }

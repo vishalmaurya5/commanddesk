@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { Prisma } from "@prisma/client";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
 
@@ -35,12 +36,20 @@ export async function auth(): Promise<AppSession> {
         { email: data.user.email },
       ],
     },
-    include: {
-      company: true,
-      memberships: {
-        where: { status: "ACTIVE" },
-        include: { company: true },
-        orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      authUserId: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      avatarUrl: true,
+      role: true,
+      isActive: true,
+      company: {
+        select: {
+          id: true,
+          name: true,
+        },
       },
     },
   });
@@ -91,12 +100,20 @@ export async function auth(): Promise<AppSession> {
             },
           },
         },
-        include: {
-          company: true,
-          memberships: {
-            where: { status: "ACTIVE" },
-            include: { company: true },
-            orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          authUserId: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          avatarUrl: true,
+          role: true,
+          isActive: true,
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
       });
@@ -114,9 +131,47 @@ export async function auth(): Promise<AppSession> {
 
   const cookieStore = await cookies();
   const requestedCompanyId = cookieStore.get("commanddesk_company_id")?.value;
+
+  let memberships: Array<{
+    companyId: string;
+    role: string;
+    company: { id: string; name: string };
+  }> = [];
+
+  if (profile.role !== "SUPER_ADMIN") {
+    try {
+      memberships = await prisma.companyMembership.findMany({
+        where: {
+          userId: profile.id,
+          status: "ACTIVE",
+        },
+        select: {
+          companyId: true,
+          role: true,
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+    } catch (error) {
+      if (
+        !(
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2021"
+        )
+      ) {
+        throw error;
+      }
+    }
+  }
+
   const activeMembership =
-    profile.memberships.find((item) => item.companyId === requestedCompanyId) ??
-    profile.memberships[0];
+    memberships.find((item) => item.companyId === requestedCompanyId) ??
+    memberships[0];
   const company = activeMembership?.company ?? profile.company;
 
   return {

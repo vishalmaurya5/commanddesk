@@ -4,8 +4,6 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { CrmService } from "@/lib/services/crm-service";
 import { LeadsClient } from "./leads-client";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 
 export default async function LeadsPage() {
   const session = await auth();
@@ -25,9 +23,6 @@ export default async function LeadsPage() {
               <h1 className="text-3xl font-bold text-slate-900">Leads Pipeline</h1>
               <p className="text-slate-500">Manage your sales prospects.</p>
             </div>
-            <Button className="bg-teal-600 hover:bg-teal-700">
-              <Plus className="mr-2 h-4 w-4" /> Add Lead
-            </Button>
           </div>
 
           <div className="flex-1 overflow-hidden">

@@ -25,7 +25,21 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('API Error:', error.response?.data || error.message);
+    const responseData = error.response?.data;
+    const message =
+      typeof responseData === 'string'
+        ? responseData
+        : responseData?.error || error.message || 'Request failed';
+
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('API request failed', {
+        method: error.config?.method?.toUpperCase(),
+        url: error.config?.url,
+        status: error.response?.status,
+        message,
+      });
+    }
+
     return Promise.reject(error);
   }
 );

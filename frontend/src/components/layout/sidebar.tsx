@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { CommandDeskIcon } from "@/components/brand/logo";
+import { SolubrixIcon } from "@/components/brand/logo";
 import {
   LayoutDashboard,
   Users,
@@ -28,6 +28,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PERMISSIONS, type Permission } from "@/lib/saas/permissions";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
 
 interface SidebarItem {
   label: string;
@@ -66,8 +68,8 @@ const sidebarItems: SidebarItem[] = [
 ];
 
 const bottomItems: SidebarItem[] = [
-  { label: "Notifications", icon: <Bell size={20} />, href: "/notifications", badge: 12, permission: PERMISSIONS.NOTIFICATIONS_VIEW },
-  { label: "Messages", icon: <MessageSquare size={20} />, href: "/messages", badge: 5, permission: PERMISSIONS.MESSAGES_USE },
+  { label: "Notifications", icon: <Bell size={20} />, href: "/notifications", permission: PERMISSIONS.NOTIFICATIONS_VIEW },
+  { label: "Messages", icon: <MessageSquare size={20} />, href: "/messages", permission: PERMISSIONS.MESSAGES_USE },
   { label: "Settings", icon: <Settings size={20} />, href: "/settings", permission: PERMISSIONS.SETTINGS_SELF },
 ];
 
@@ -82,6 +84,16 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["Employees"]);
   const [permissions, setPermissions] = useState<Set<string> | null>(null);
   const pathname = usePathname();
+  const { data: notificationData } = useQuery({
+    queryKey: ["notifications", "badge"],
+    queryFn: () => apiClient.get("/notifications?unread=true").then((response) => response.data),
+    refetchInterval: 30000,
+  });
+  const { data: messageData } = useQuery({
+    queryKey: ["messages", "badge"],
+    queryFn: () => apiClient.get("/messages").then((response) => response.data),
+    refetchInterval: 10000,
+  });
 
   useEffect(() => {
     fetch("/api/access")
@@ -93,7 +105,9 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
   }, []);
 
   const canView = (item: SidebarItem) =>
-    !permissions || !item.permission || permissions.has(item.permission);
+    permissions === null
+      ? item.href === "/"
+      : !item.permission || permissions.has(item.permission);
 
   const visibleSidebarItems = sidebarItems
     .filter(canView)
@@ -101,7 +115,15 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
       ...item,
       children: item.children?.filter(canView),
     }));
-  const visibleBottomItems = bottomItems.filter(canView);
+  const visibleBottomItems = bottomItems.filter(canView).map((item) => ({
+    ...item,
+    badge:
+      item.href === "/notifications"
+        ? notificationData?.unreadCount ?? 0
+        : item.href === "/messages"
+          ? messageData?.unreadCount ?? 0
+          : item.badge,
+  }));
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
@@ -141,11 +163,11 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
           )}
         >
           <div className="flex items-center gap-2">
-            <CommandDeskIcon size="sm" />
+            <SolubrixIcon size="sm" />
             {(!collapsed || mobileOpen) && (
               <span className="font-heading text-lg font-bold tracking-tight">
-                <span className="text-foreground">Command</span>
-                <span className="text-teal font-extrabold">Desk</span>
+                <span className="text-foreground">SOLU</span>
+                <span className="font-extrabold text-[#1976FF]">BRIX</span>
               </span>
             )}
           </div>

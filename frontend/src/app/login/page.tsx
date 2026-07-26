@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { CommandDeskLogo } from "@/components/brand/logo";
+import { SolubrixLogo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
@@ -84,7 +84,7 @@ export default function LoginPage() {
             transition={{ duration: 0.6 }}
             className="text-center"
           >
-            <CommandDeskLogo variant="white" size="xl" showTagline />
+            <SolubrixLogo variant="white" size="xl" showTagline />
           </motion.div>
         </div>
       </div>
@@ -98,14 +98,14 @@ export default function LoginPage() {
           className="w-full max-w-md"
         >
           <div className="lg:hidden flex justify-center mb-8">
-            <CommandDeskLogo size="lg" />
+            <SolubrixLogo size="lg" />
           </div>
           <h1 className="text-3xl font-heading font-bold text-foreground mb-2">
             {mode === "sign-in" ? "Welcome back" : "Create your account"}
           </h1>
           <p className="text-muted-foreground mb-8">
             {mode === "sign-in"
-              ? "Sign in to your CommandDesk workspace"
+              ? "Sign in to your SOLUBRIX workspace"
               : "Start with secure email authentication"}
           </p>
 

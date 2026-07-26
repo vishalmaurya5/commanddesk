@@ -6,6 +6,7 @@ interface CreatePolicyInput {
   type?: string;
   content?: string;
   companyId: string;
+  uploaderId: string;
 }
 
 interface CreateDocumentInput {
@@ -16,7 +17,7 @@ interface CreateDocumentInput {
   description?: string;
   folder?: string;
   companyId: string;
-  uploaderId?: string;
+  uploaderId: string;
 }
 
 interface CreateTrainingInput {
@@ -26,6 +27,7 @@ interface CreateTrainingInput {
   startDate?: Date;
   endDate?: Date;
   companyId: string;
+  uploaderId: string;
   trainerId?: string;
 }
 
@@ -72,7 +74,7 @@ export class HrmsService {
         fileUrl: data.content || "",
         fileType: "policy",
         folder: "POLICY",
-        uploaderId: data.companyId,
+        uploaderId: data.uploaderId,
       },
     });
   }
@@ -87,7 +89,17 @@ export class HrmsService {
   }
 
   static async createDocument(data: CreateDocumentInput) {
-    return prisma.document.create({ data: data as any });
+    return prisma.document.create({
+      data: {
+        name: data.name,
+        fileUrl: data.fileUrl,
+        fileType: data.fileType,
+        fileSize: data.fileSize,
+        description: data.description,
+        folder: data.folder || "HR_DOCUMENT",
+        uploaderId: data.uploaderId,
+      },
+    });
   }
 
   static async getTrainings(companyId: string) {
@@ -105,7 +117,7 @@ export class HrmsService {
         fileUrl: "",
         fileType: "training",
         folder: "TRAINING",
-        uploaderId: data.companyId,
+        uploaderId: data.uploaderId,
       },
     });
   }
@@ -119,7 +131,20 @@ export class HrmsService {
   }
 
   static async createAsset(data: CreateAssetInput) {
-    return prisma.asset.create({ data: data as any });
+    if (!data.userId) throw new Error("Employee assignment is required");
+    return prisma.asset.create({
+      data: {
+        name: data.name,
+        type: data.type,
+        serialNumber: data.serialNumber,
+        model: data.model,
+        brand: data.brand,
+        value: data.value,
+        status: data.status || "ASSIGNED",
+        assignedAt: new Date(),
+        userId: data.userId,
+      },
+    });
   }
 
   static async create(data: CreateHrmsInput) {

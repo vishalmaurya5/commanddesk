@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { use } from 'react';
@@ -9,6 +9,7 @@ import Link from 'next/link';
 
 export default function ProjectKanbanPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const queryClient = useQueryClient();
 
   // In a real implementation, we'd fetch the project and its tasks
   // For the UI demonstration, we'll fetch tasks and mock the grouping
@@ -20,9 +21,14 @@ export default function ProjectKanbanPage({ params }: { params: Promise<{ id: st
   const columns = [
     { id: 'TODO', title: 'To Do', color: 'bg-gray-100 dark:bg-gray-800' },
     { id: 'IN_PROGRESS', title: 'In Progress', color: 'bg-blue-50 dark:bg-blue-900/20' },
-    { id: 'IN_REVIEW', title: 'Review', color: 'bg-yellow-50 dark:bg-yellow-900/20' },
-    { id: 'DONE', title: 'Done', color: 'bg-green-50 dark:bg-green-900/20' },
+    { id: 'REVIEW', title: 'Review', color: 'bg-yellow-50 dark:bg-yellow-900/20' },
+    { id: 'COMPLETED', title: 'Done', color: 'bg-green-50 dark:bg-green-900/20' },
   ];
+  const updateTask = useMutation({
+    mutationFn: ({ taskId, status }: { taskId: string; status: string }) =>
+      apiClient.patch(`/tasks/${taskId}`, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks', 'project', id] }),
+  });
 
   const getTasksByStatus = (status: string) => {
     if (!tasks) return [];
@@ -55,10 +61,10 @@ export default function ProjectKanbanPage({ params }: { params: Promise<{ id: st
                 +2
               </div>
             </div>
-            <button className="flex items-center gap-2 rounded-xl bg-primary-indigo px-4 py-2 text-sm font-medium text-white transition-all hover:bg-primary-indigo/90">
+            <Link href="/tasks" className="flex items-center gap-2 rounded-xl bg-primary-indigo px-4 py-2 text-sm font-medium text-white transition-all hover:bg-primary-indigo/90">
               <Plus className="h-4 w-4" />
               New Task
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -108,9 +114,9 @@ export default function ProjectKanbanPage({ params }: { params: Promise<{ id: st
                         }`}>
                           {task.priority || 'LOW'}
                         </span>
-                        <button className="opacity-0 transition-opacity group-hover:opacity-100 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </button>
+                        <select value={task.status} onChange={(event) => updateTask.mutate({ taskId: task.id, status: event.target.value })} className="rounded border border-gray-200 bg-white px-1 py-0.5 text-[10px] dark:border-gray-700 dark:bg-gray-900">
+                          <option value="TODO">To do</option><option value="IN_PROGRESS">In progress</option><option value="REVIEW">Review</option><option value="TESTING">Testing</option><option value="COMPLETED">Done</option>
+                        </select>
                       </div>
                       
                       <h4 className="font-heading text-sm font-semibold text-midnight-navy dark:text-white">

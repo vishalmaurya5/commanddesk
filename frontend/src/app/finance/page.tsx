@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { apiClient } from "@/lib/api-client";
 import {
@@ -17,6 +18,9 @@ import {
 import Link from "next/link";
 
 export default function FinanceDashboardPage() {
+  const queryClient = useQueryClient();
+  const [formType, setFormType] = useState<"invoice" | "expense" | null>(null);
+  const [form, setForm] = useState({ invoiceNumber: "", amount: "", tax: "", dueDate: "", description: "", category: "", date: "" });
   const { data, isLoading } = useQuery({
     queryKey: ["finance-overview"],
     queryFn: async () => {
@@ -34,6 +38,11 @@ export default function FinanceDashboardPage() {
 
   const invoices = data?.invoices || [];
   const expenses = data?.expenses || [];
+  const saveRecord = useMutation({
+    mutationFn: () => apiClient.post("/finance", { type: formType, ...form, amount: Number(form.amount), tax: Number(form.tax || 0) }),
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["finance-overview"] }); setForm({ invoiceNumber: "", amount: "", tax: "", dueDate: "", description: "", category: "", date: "" }); setFormType(null); },
+  });
+  const updateInvoice = useMutation({ mutationFn: ({ id, status }: { id: string; status: string }) => apiClient.patch("/finance", { type: "invoice", id, status }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["finance-overview"] }) });
 
   return (
     <DashboardLayout>
@@ -71,6 +80,8 @@ export default function FinanceDashboardPage() {
             </div>
           </div>
         </section>
+        <div className="flex flex-wrap gap-3"><button onClick={() => setFormType("invoice")} className="flex items-center gap-2 rounded-xl bg-primary-indigo px-4 py-2 text-sm font-medium text-white"><Plus className="h-4 w-4" /> New Invoice</button><button onClick={() => setFormType("expense")} className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium"><Plus className="h-4 w-4" /> Log Expense</button></div>
+        {formType && <form onSubmit={(event) => { event.preventDefault(); saveRecord.mutate(); }} className="rounded-2xl border bg-card p-5"><h2 className="mb-4 font-semibold">{formType === "invoice" ? "Create invoice" : "Log expense"}</h2><div className="grid gap-4 md:grid-cols-2">{formType === "invoice" ? <><label className="text-sm font-medium">Invoice number<input required value={form.invoiceNumber} onChange={(event) => setForm({ ...form, invoiceNumber: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Tax<input type="number" min="0" value={form.tax} onChange={(event) => setForm({ ...form, tax: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Due date<input type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label></> : <><label className="text-sm font-medium">Description<input required value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Category<input value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Date<input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label></>}<label className="text-sm font-medium">Amount<input required type="number" min="0" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label></div>{saveRecord.error && <p className="mt-2 text-sm text-red-600">{saveRecord.error.message}</p>}<div className="mt-4 flex justify-end gap-3"><button type="button" onClick={() => setFormType(null)} className="rounded-xl border px-4 py-2">Cancel</button><button disabled={saveRecord.isPending} className="rounded-xl bg-primary-indigo px-5 py-2 font-semibold text-white disabled:opacity-50">{saveRecord.isPending ? "Saving..." : "Save"}</button></div></form>}
 
         {/* Stats Overview Grid */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -143,7 +154,9 @@ export default function FinanceDashboardPage() {
                     </div>
                     <div className="text-right">
                       <div className="font-mono font-bold text-foreground text-sm">${inv.total.toLocaleString()}</div>
-                      <span
+                      <select
+                        value={inv.status}
+                        onChange={(event) => updateInvoice.mutate({ id: inv.id, status: event.target.value })}
                         className={`inline-block text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${
                           inv.status === "PAID"
                             ? "bg-emerald-500/10 text-emerald-500"
@@ -151,9 +164,7 @@ export default function FinanceDashboardPage() {
                             ? "bg-rose-500/10 text-rose-500"
                             : "bg-amber-500/10 text-amber-500"
                         }`}
-                      >
-                        {inv.status}
-                      </span>
+                      ><option value="DRAFT">Draft</option><option value="SENT">Sent</option><option value="PAID">Paid</option><option value="OVERDUE">Overdue</option><option value="CANCELLED">Cancelled</option></select>
                     </div>
                   </div>
                 ))}

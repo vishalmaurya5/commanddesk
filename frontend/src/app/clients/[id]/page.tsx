@@ -40,8 +40,8 @@ export default async function ClientProfilePage({ params }: { params: Promise<{ 
                 <p className="text-slate-500">{client.companyName || "Individual Client"}</p>
               </div>
               <div className="ml-auto flex gap-2">
-                <Button variant="outline">Edit Client</Button>
-                <Button className="bg-teal-600 hover:bg-teal-700">New Project</Button>
+                <Button variant="outline" asChild><Link href="/clients">Manage Client</Link></Button>
+                <Button className="bg-teal-600 hover:bg-teal-700" asChild><Link href="/projects">New Project</Link></Button>
               </div>
             </div>
 

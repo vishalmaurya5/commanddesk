@@ -1,48 +1,43 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { AttendanceService } from "@/lib/services/attendance-service";
+import { authorize } from "@/lib/saas/authorize";
+import { apiError } from "@/lib/saas/api-error";
+import { PERMISSIONS } from "@/lib/saas/permissions";
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
     const { searchParams } = new URL(request.url);
     const month = searchParams.get("month") ? parseInt(searchParams.get("month")!) : undefined;
     const year = searchParams.get("year") ? parseInt(searchParams.get("year")!) : undefined;
     const userId = searchParams.get("userId");
 
     if (userId) {
+      await authorize(PERMISSIONS.ATTENDANCE_VIEW);
       const attendance = await AttendanceService.getByUser(userId, month, year);
       return NextResponse.json(attendance);
     }
-    const attendance = await AttendanceService.getAll((session.user as any).companyId);
+    const { userId: currentUserId } = await authorize(PERMISSIONS.ATTENDANCE_SELF);
+    const attendance = await AttendanceService.getByUser(currentUserId, month, year);
     return NextResponse.json(attendance);
   } catch (error) {
-    console.error("Error fetching attendance:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError(error, "Unable to load attendance");
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { userId } = await authorize(PERMISSIONS.ATTENDANCE_SELF);
     const { action, ...data } = await request.json();
     if (action === "clock-in") {
-      const attendance = await AttendanceService.clockIn((session.user as any).id, data);
+      const attendance = await AttendanceService.clockIn(userId, data);
       return NextResponse.json(attendance, { status: 201 });
     }
     if (action === "clock-out") {
-      const attendance = await AttendanceService.clockOut((session.user as any).id);
+      const attendance = await AttendanceService.clockOut(userId);
       return NextResponse.json(attendance);
     }
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error: any) {
-    console.error("Error processing attendance:", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+  } catch (error) {
+    return apiError(error, "Unable to update attendance");
   }
 }

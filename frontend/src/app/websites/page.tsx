@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { apiClient } from "@/lib/api-client";
 import {
@@ -16,6 +17,9 @@ import {
 } from "lucide-react";
 
 export default function WebsitesPage() {
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: "", domain: "" });
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["websites-list"],
     queryFn: async () => {
@@ -25,6 +29,8 @@ export default function WebsitesPage() {
   });
 
   const websites = data?.websites || [];
+  const addWebsite = useMutation({ mutationFn: () => apiClient.post("/websites", form), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["websites-list"] }); setForm({ name: "", domain: "" }); setShowForm(false); } });
+  const removeWebsite = useMutation({ mutationFn: (id: string) => apiClient.delete(`/websites?id=${id}`), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["websites-list"] }) });
 
   return (
     <DashboardLayout>
@@ -46,11 +52,13 @@ export default function WebsitesPage() {
                 Monitor live app performance, domain SSL health, uptime metrics, and custom landing page deployments.
               </p>
             </div>
-            <button className="flex items-center justify-center gap-2 rounded-xl bg-teal px-4 py-2.5 font-medium text-white shadow-lg transition hover:opacity-90">
+            <button onClick={() => setShowForm((value) => !value)} className="flex items-center justify-center gap-2 rounded-xl bg-teal px-4 py-2.5 font-medium text-white shadow-lg transition hover:opacity-90">
               <Plus className="h-4 w-4" /> Add Domain / Property
             </button>
           </div>
         </section>
+        {showForm && <form onSubmit={(event) => { event.preventDefault(); addWebsite.mutate(); }} className="rounded-2xl border bg-card p-5"><div className="grid gap-4 md:grid-cols-2"><label className="text-sm font-medium">Property name<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Domain<input required placeholder="example.com" value={form.domain} onChange={(event) => setForm({ ...form, domain: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label></div>{addWebsite.error && <p className="mt-2 text-sm text-red-600">{addWebsite.error.message}</p>}<div className="mt-4 flex justify-end"><button disabled={addWebsite.isPending} className="rounded-xl bg-primary-indigo px-5 py-2 font-semibold text-white disabled:opacity-50">{addWebsite.isPending ? "Adding..." : "Add Property"}</button></div></form>}
+        <div className="flex justify-end"><button onClick={() => refetch()} className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm"><RefreshCw className="h-4 w-4" /> Refresh</button></div>
 
         {/* Websites Status Cards */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -108,8 +116,8 @@ export default function WebsitesPage() {
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-500">
                     <CheckCircle2 className="h-3 w-3" /> Operational
                   </span>
-                  <button className="text-xs font-medium text-muted-foreground hover:text-foreground">
-                    Settings
+                  <button onClick={() => window.confirm("Remove this property?") && removeWebsite.mutate(site.id)} className="text-xs font-medium text-muted-foreground hover:text-red-600">
+                    Remove
                   </button>
                 </div>
               </div>

@@ -1,12 +1,17 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 export class DepartmentService {
   static async getAll(companyId: string) {
     return prisma.department.findMany({
       where: { companyId, isActive: true },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        description: true,
         head: { select: { id: true, firstName: true, lastName: true } },
-        users: { select: { id: true } },
+        _count: { select: { users: true } },
       },
       orderBy: { name: "asc" },
     });
@@ -38,7 +43,7 @@ export class DepartmentService {
     });
   }
 
-  static async update(id: string, data: any) {
+  static async update(id: string, data: Prisma.DepartmentUpdateInput) {
     return prisma.department.update({
       where: { id },
       data,

@@ -19,15 +19,15 @@ const sizes = {
 };
 
 const textColors = {
-  default: { command: "text-foreground", desk: "text-teal font-extrabold" },
-  icon: { command: "text-foreground", desk: "text-teal font-extrabold" },
-  white: { command: "text-white", desk: "text-teal-300 font-extrabold" },
-  black: { command: "text-foreground", desk: "text-teal font-extrabold" },
-  gradient: { command: "text-foreground", desk: "text-teal font-extrabold" },
-  dark: { command: "text-white", desk: "text-teal-400 font-extrabold" },
+  default: { command: "text-[#1F1F1F] dark:text-white", desk: "text-[#1976FF] font-extrabold" },
+  icon: { command: "text-[#1F1F1F] dark:text-white", desk: "text-[#1976FF] font-extrabold" },
+  white: { command: "text-white", desk: "text-[#5EA0FF] font-extrabold" },
+  black: { command: "text-[#1F1F1F]", desk: "text-[#1976FF] font-extrabold" },
+  gradient: { command: "text-[#1F1F1F] dark:text-white", desk: "text-[#1976FF] font-extrabold" },
+  dark: { command: "text-white", desk: "text-[#5EA0FF] font-extrabold" },
 };
 
-export function CommandDeskLogo({
+export function SolubrixLogo({
   variant = "default",
   size = "md",
   showTagline = false,
@@ -45,8 +45,8 @@ export function CommandDeskLogo({
         className="relative flex-shrink-0"
       >
         <Image
-          src="/brand/commanddesk-icon-512.png"
-          alt="CommandDesk"
+          src="/brand/solubrix-icon-transparent.png"
+          alt="SOLUBRIX"
           width={dimensions.icon}
           height={dimensions.icon}
           priority
@@ -56,10 +56,10 @@ export function CommandDeskLogo({
       <div className="flex flex-col">
         <div className="flex items-baseline">
           <span className={cn("font-heading font-bold tracking-tight", dimensions.text, colors.command)}>
-            Command
+            SOLU
           </span>
           <span className={cn("font-heading font-bold tracking-tight", dimensions.text, colors.desk)}>
-            Desk
+            BRIX
           </span>
         </div>
         {showTagline && (
@@ -70,7 +70,7 @@ export function CommandDeskLogo({
               variant === "white" || variant === "dark" ? "text-white/70" : "text-muted-foreground",
             )}
           >
-            Manage &bull; Monitor &bull; Grow
+            Solutions That Build Futures
           </span>
         )}
       </div>
@@ -78,7 +78,7 @@ export function CommandDeskLogo({
   );
 }
 
-export function CommandDeskIcon({
+export function SolubrixIcon({
   size = "md",
   className,
 }: Omit<LogoProps, "showTagline">) {
@@ -86,8 +86,8 @@ export function CommandDeskIcon({
 
   return (
     <Image
-      src="/brand/commanddesk-icon-512.png"
-      alt="CommandDesk"
+      src="/brand/solubrix-icon-transparent.png"
+      alt="SOLUBRIX"
       width={iconSize}
       height={iconSize}
       className={cn("flex-shrink-0", className)}

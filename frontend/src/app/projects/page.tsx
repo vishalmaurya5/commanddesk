@@ -1,16 +1,93 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Plus, Search, Folder, Calendar, Users, BarChart3 } from 'lucide-react';
+import { Plus, Search, Folder, Calendar, X } from 'lucide-react';
 import Link from 'next/link';
+import { useMemo, useState } from 'react';
+
+type Project = {
+  id: string;
+  name: string;
+  description?: string | null;
+  status: string;
+  priority?: string | null;
+  endDate?: string | null;
+  estimatedHours?: number | null;
+  actualHours?: number | null;
+  _count?: { tasks: number };
+};
+
+type Employee = {
+  id: string;
+  firstName: string;
+  lastName: string;
+};
 
 export default function ProjectsPage() {
-  const { data: projects, isLoading, error } = useQuery({
+  const queryClient = useQueryClient();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('ACTIVE');
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    leadId: '',
+    priority: 'MEDIUM',
+    startDate: '',
+    endDate: '',
+  });
+
+  const { data: projects = [], isLoading, error } = useQuery({
     queryKey: ['projects'],
     queryFn: () => apiClient.get('/projects').then((res) => res.data),
   });
+
+  const {
+    data: employees = [],
+    isLoading: areEmployeesLoading,
+    error: employeesError,
+  } = useQuery<Employee[]>({
+    queryKey: ['employees', 'project-leads'],
+    queryFn: () => apiClient.get('/employees').then((res) => res.data),
+    enabled: isCreateOpen,
+  });
+
+  const selectedLeadId = form.leadId || employees[0]?.id || '';
+
+  const createProject = useMutation({
+    mutationFn: () =>
+      apiClient.post('/projects', {
+        ...form,
+        leadId: form.leadId || employees[0]?.id,
+        startDate: form.startDate || undefined,
+        endDate: form.endDate || undefined,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setForm({
+        name: '',
+        description: '',
+        leadId: '',
+        priority: 'MEDIUM',
+        startDate: '',
+        endDate: '',
+      });
+      setIsCreateOpen(false);
+    },
+  });
+
+  const filteredProjects = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (projects as Project[]).filter((project) => {
+      const matchesStatus = status === 'ALL' || project.status === status;
+      const matchesSearch =
+        !term ||
+        `${project.name} ${project.description ?? ''}`.toLowerCase().includes(term);
+      return matchesStatus && matchesSearch;
+    });
+  }, [projects, search, status]);
 
   return (
     <DashboardLayout>
@@ -22,14 +99,157 @@ export default function ProjectsPage() {
               Projects
             </h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Manage your company's active projects, timelines, and teams.
+              Manage your company&apos;s active projects, timelines, and teams.
             </p>
           </div>
-          <button className="flex items-center gap-2 rounded-xl bg-primary-indigo px-4 py-2 text-sm font-medium text-white transition-all hover:bg-primary-indigo/90 hover:shadow-md">
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen((open) => !open)}
+            className="flex items-center gap-2 rounded-xl bg-primary-indigo px-4 py-2 text-sm font-medium text-white transition-all hover:bg-primary-indigo/90 hover:shadow-md"
+          >
             <Plus className="h-4 w-4" />
             New Project
           </button>
         </div>
+
+        {isCreateOpen && (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              createProject.mutate();
+            }}
+            className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm dark:border-indigo-500/20 dark:bg-midnight-navy"
+          >
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="font-heading text-lg font-semibold text-midnight-navy dark:text-white">
+                  Create a new project
+                </h2>
+                <p className="text-sm text-gray-500">Add the project basics and assign its lead.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(false)}
+                className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800"
+                aria-label="Close new project form"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-1.5 text-sm font-medium text-gray-700 dark:text-gray-200">
+                Project name
+                <input
+                  required
+                  value={form.name}
+                  onChange={(event) => setForm({ ...form, name: event.target.value })}
+                  className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 outline-none focus:border-primary-indigo focus:ring-4 focus:ring-primary-indigo/10 dark:border-gray-700 dark:bg-gray-900"
+                  placeholder="Website redesign"
+                />
+              </label>
+              <label className="space-y-1.5 text-sm font-medium text-gray-700 dark:text-gray-200">
+                Project lead
+                <select
+                  required
+                  value={selectedLeadId}
+                  onChange={(event) => setForm({ ...form, leadId: event.target.value })}
+                  className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 outline-none focus:border-primary-indigo focus:ring-4 focus:ring-primary-indigo/10 dark:border-gray-700 dark:bg-gray-900"
+                >
+                  <option value="">Select a project lead</option>
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.firstName} {employee.lastName}
+                    </option>
+                  ))}
+                </select>
+                {areEmployeesLoading && (
+                  <span className="block text-xs font-normal text-gray-500">
+                    Loading project leads…
+                  </span>
+                )}
+                {employeesError && (
+                  <span className="block text-xs font-normal text-red-600">
+                    Project leads could not be loaded. Refresh and try again.
+                  </span>
+                )}
+                {!areEmployeesLoading && !employeesError && employees.length === 0 && (
+                  <span className="block text-xs font-normal text-amber-600">
+                    Add an active employee before creating a project.
+                  </span>
+                )}
+              </label>
+              <label className="space-y-1.5 text-sm font-medium text-gray-700 dark:text-gray-200">
+                Priority
+                <select
+                  value={form.priority}
+                  onChange={(event) => setForm({ ...form, priority: event.target.value })}
+                  className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 outline-none focus:border-primary-indigo dark:border-gray-700 dark:bg-gray-900"
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1.5 text-sm font-medium text-gray-700 dark:text-gray-200">
+                  Start date
+                  <input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(event) => setForm({ ...form, startDate: event.target.value })}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 dark:border-gray-700 dark:bg-gray-900"
+                  />
+                </label>
+                <label className="space-y-1.5 text-sm font-medium text-gray-700 dark:text-gray-200">
+                  End date
+                  <input
+                    type="date"
+                    value={form.endDate}
+                    onChange={(event) => setForm({ ...form, endDate: event.target.value })}
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 dark:border-gray-700 dark:bg-gray-900"
+                  />
+                </label>
+              </div>
+              <label className="space-y-1.5 text-sm font-medium text-gray-700 md:col-span-2 dark:text-gray-200">
+                Description
+                <textarea
+                  value={form.description}
+                  onChange={(event) => setForm({ ...form, description: event.target.value })}
+                  rows={3}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 outline-none focus:border-primary-indigo focus:ring-4 focus:ring-primary-indigo/10 dark:border-gray-700 dark:bg-gray-900"
+                  placeholder="What is this project intended to deliver?"
+                />
+              </label>
+            </div>
+
+            {createProject.error && (
+              <p className="mt-4 text-sm text-red-600">
+                {createProject.error instanceof Error
+                  ? createProject.error.message
+                  : 'Unable to create the project.'}
+              </p>
+            )}
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsCreateOpen(false)}
+                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={createProject.isPending || employees.length === 0}
+                className="rounded-xl bg-primary-indigo px-5 py-2 text-sm font-semibold text-white hover:bg-primary-indigo/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {createProject.isPending ? 'Creating…' : 'Create Project'}
+              </button>
+            </div>
+          </form>
+        )}
 
         {/* Toolbar */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -37,15 +257,22 @@ export default function ProjectsPage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="Search projects..."
               className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-10 pr-4 text-sm text-midnight-navy focus:border-primary-indigo focus:outline-none focus:ring-1 focus:ring-primary-indigo dark:border-gray-700 dark:bg-midnight-navy dark:text-white"
             />
           </div>
           <div className="flex items-center gap-2">
-            <select className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-midnight-navy focus:border-primary-indigo focus:outline-none focus:ring-1 focus:ring-primary-indigo dark:border-gray-700 dark:bg-midnight-navy dark:text-white">
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-midnight-navy focus:border-primary-indigo focus:outline-none focus:ring-1 focus:ring-primary-indigo dark:border-gray-700 dark:bg-midnight-navy dark:text-white"
+            >
               <option value="ACTIVE">Active Projects</option>
               <option value="COMPLETED">Completed</option>
               <option value="ON_HOLD">On Hold</option>
+              <option value="ALL">All Projects</option>
             </select>
           </div>
         </div>
@@ -66,16 +293,29 @@ export default function ProjectsPage() {
         {/* Projects Grid */}
         {!isLoading && !error && (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {projects?.length === 0 ? (
+            {filteredProjects.length === 0 ? (
               <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-12 dark:border-gray-700 dark:bg-gray-800/30">
                 <Folder className="mb-4 h-12 w-12 text-gray-400" />
                 <h3 className="text-lg font-medium text-midnight-navy dark:text-white">No active projects</h3>
                 <p className="text-sm text-gray-500">Create a new project to get started.</p>
               </div>
             ) : (
-              projects?.map((project: any) => {
-                // Calculate progress mock
-                const progress = project.status === 'COMPLETED' ? 100 : Math.floor(Math.random() * 60) + 10;
+              filteredProjects.map((project) => {
+                const progress =
+                  project.status === 'COMPLETED'
+                    ? 100
+                    : project.estimatedHours
+                      ? Math.min(
+                          99,
+                          Math.round(
+                            ((project.actualHours ?? 0) / project.estimatedHours) * 100,
+                          ),
+                        )
+                      : 0;
+                const avatarCount = Math.min(
+                  3,
+                  Math.max(1, project._count?.tasks ?? 1),
+                );
                 
                 return (
                   <Link href={`/projects/${project.id}`} key={project.id}>
@@ -122,7 +362,7 @@ export default function ProjectsPage() {
                           
                           <div className="flex -space-x-2">
                             {/* Mock Avatars */}
-                            {[...Array(Math.floor(Math.random() * 3) + 1)].map((_, i) => (
+                            {Array.from({ length: avatarCount }).map((_, i) => (
                               <div key={i} className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-premium-teal/20 text-[10px] font-bold text-premium-teal dark:border-midnight-navy">
                                 {String.fromCharCode(65 + i)}
                               </div>

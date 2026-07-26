@@ -25,7 +25,7 @@ const ibmPlexSans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "CommandDesk - Enterprise Business OS",
+  title: "SOLUBRIX - Solutions That Build Futures",
   description:
     "Manage • Monitor • Grow - All-in-one Enterprise SaaS Business Operating System",
   keywords: [

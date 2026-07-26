@@ -1,48 +1,33 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { NotificationService } from "@/lib/services/notification-service";
+import { prisma } from "@/lib/prisma";
+import { authorize } from "@/lib/saas/authorize";
+import { apiError } from "@/lib/saas/api-error";
+import { PERMISSIONS } from "@/lib/saas/permissions";
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const { searchParams } = new URL(request.url);
-    const unreadOnly = searchParams.get("unread") === "true";
-    const notifications = await NotificationService.getAll(
-      (session.user as any).id,
-      unreadOnly
-    );
-    const unreadCount = await NotificationService.getUnreadCount(
-      (session.user as any).id
-    );
+    const { userId } = await authorize(PERMISSIONS.NOTIFICATIONS_VIEW);
+    const unreadOnly = new URL(request.url).searchParams.get("unread") === "true";
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({ where: { userId, ...(unreadOnly ? { isRead: false } : {}) }, orderBy: { createdAt: "desc" }, take: 100 }),
+      prisma.notification.count({ where: { userId, isRead: false } }),
+    ]);
     return NextResponse.json({ notifications, unreadCount });
-  } catch (error) {
-    console.error("Error fetching notifications:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
+  } catch (error) { return apiError(error, "Unable to load notifications"); }
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const { action } = await request.json();
-    if (action === "markAllRead") {
-      await NotificationService.markAllAsRead((session.user as any).id);
-      return NextResponse.json({ message: "All notifications marked as read" });
-    }
+    const { userId } = await authorize(PERMISSIONS.NOTIFICATIONS_VIEW);
     const body = await request.json();
-    const notification = await NotificationService.create({
-      ...body,
-      userId: (session.user as any).id,
-    });
-    return NextResponse.json(notification, { status: 201 });
-  } catch (error) {
-    console.error("Error managing notifications:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
+    if (body.action === "markAllRead") {
+      const result = await prisma.notification.updateMany({ where: { userId, isRead: false }, data: { isRead: true, readAt: new Date() } });
+      return NextResponse.json({ updated: result.count });
+    }
+    if (body.action === "clearAll") {
+      const result = await prisma.notification.deleteMany({ where: { userId } });
+      return NextResponse.json({ deleted: result.count });
+    }
+    return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
+  } catch (error) { return apiError(error, "Unable to update notifications"); }
 }

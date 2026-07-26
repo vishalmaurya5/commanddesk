@@ -605,6 +605,7 @@ model Chat {
 model ChatParticipant {
   id       String   @id @default(cuid())
   joinedAt DateTime @default(now())
+  lastReadAt DateTime @default(now())
   role     String   @default("MEMBER")
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)

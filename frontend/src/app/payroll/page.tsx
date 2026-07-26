@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { apiClient } from "@/lib/api-client";
 import {
@@ -16,12 +17,25 @@ import {
 } from "lucide-react";
 
 export default function PayrollPage() {
+  const queryClient = useQueryClient();
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
   const { data, isLoading } = useQuery({
-    queryKey: ["payroll-summary"],
+    queryKey: ["payroll-summary", month, year],
     queryFn: async () => {
-      const res = await apiClient.get("/payroll");
+      const res = await apiClient.get(`/payroll?month=${month}&year=${year}`);
       return res.data;
     },
+  });
+  const runPayroll = useMutation({
+    mutationFn: () => apiClient.post("/payroll", { month, year }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["payroll-summary"] }),
+  });
+  const updatePayroll = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      apiClient.patch("/payroll", { id, status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["payroll-summary"] }),
   });
 
   const summary = data?.summary || {
@@ -53,8 +67,12 @@ export default function PayrollPage() {
                 Process monthly employee salaries, generate tax slips, manage bonuses, and track disbursements.
               </p>
             </div>
-            <button className="flex items-center justify-center gap-2 rounded-xl bg-teal px-4 py-2.5 font-medium text-white shadow-lg transition hover:opacity-90">
-              <Send className="h-4 w-4" /> Run Payroll Batch
+            <button
+              onClick={() => runPayroll.mutate()}
+              disabled={runPayroll.isPending}
+              className="flex items-center justify-center gap-2 rounded-xl bg-teal px-4 py-2.5 font-medium text-white shadow-lg transition hover:opacity-90 disabled:opacity-50"
+            >
+              <Send className="h-4 w-4" /> {runPayroll.isPending ? "Running..." : "Run Payroll Batch"}
             </button>
           </div>
         </section>
@@ -105,6 +123,18 @@ export default function PayrollPage() {
             <span className="text-xs text-muted-foreground">Automatic schedule</span>
           </div>
         </div>
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-4">
+          <label className="text-sm font-medium">Month
+            <select value={month} onChange={(event) => setMonth(Number(event.target.value))} className="ml-2 rounded-lg border border-border bg-card px-3 py-2">
+              {Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{new Date(2000, index).toLocaleString(undefined, { month: "long" })}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium">Year
+            <input type="number" min="2020" max="2100" value={year} onChange={(event) => setYear(Number(event.target.value))} className="ml-2 w-24 rounded-lg border border-border bg-card px-3 py-2" />
+          </label>
+          {runPayroll.isSuccess && <span className="text-sm text-emerald-600">{runPayroll.data.data.created} payroll record(s) created.</span>}
+          {runPayroll.error && <span className="text-sm text-red-600">{runPayroll.error.message}</span>}
+        </div>
 
         {/* Payslips Table */}
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -112,7 +142,16 @@ export default function PayrollPage() {
             <h3 className="text-lg font-semibold text-card-foreground">
               Employee Payslips & Salary Breakdown
             </h3>
-            <button className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted">
+            <button
+              onClick={() => {
+                const rows = [["Employee", "Department", "Base Salary", "Bonus", "Deductions", "Net Pay", "Status"], ...payslips.map((item: any) => [item.employeeName, item.department, item.baseSalary, item.bonus, item.deductions, item.netPay, item.status])];
+                const csv = rows.map((row) => row.map((value: unknown) => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n");
+                const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+                const anchor = document.createElement("a"); anchor.href = url; anchor.download = `payroll-${year}-${month}.csv`; anchor.click(); URL.revokeObjectURL(url);
+              }}
+              disabled={payslips.length === 0}
+              className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+            >
               <Download className="h-3.5 w-3.5" /> Export All Payslips (CSV)
             </button>
           </div>
@@ -162,9 +201,12 @@ export default function PayrollPage() {
                         </span>
                       </td>
                       <td className="py-3.5 text-right">
-                        <button className="text-xs text-teal font-medium hover:underline">
-                          View Slip
-                        </button>
+                        <select value={ps.status} onChange={(event) => updatePayroll.mutate({ id: ps.id, status: event.target.value })} className="rounded-lg border border-border bg-card px-2 py-1 text-xs">
+                          <option value="PENDING">Pending</option>
+                          <option value="PROCESSING">Processing</option>
+                          <option value="PAID">Paid</option>
+                          <option value="CANCELLED">Cancelled</option>
+                        </select>
                       </td>
                     </tr>
                   ))}

@@ -1,201 +1,39 @@
 "use client";
-
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MessageSquare, Plus, Search, Send, Users, X } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { apiClient } from "@/lib/api-client";
-import {
-  MessageSquare,
-  Hash,
-  User,
-  Send,
-  Paperclip,
-  Smile,
-  Search,
-  MoreVertical,
-  Circle,
-} from "lucide-react";
+
+type Chat = { id: string; name: string; isGroup: boolean; unread: number; lastMessage: string; updatedAt: string };
+type Teammate = { id: string; firstName: string; lastName: string; avatarUrl?: string | null };
+type Message = { id: string; content: string; createdAt: string; senderId: string; sender: Teammate };
+type ChatData = { chats: Chat[]; users: Teammate[]; messages: Message[]; unreadCount: number; currentUserId: string };
 
 export default function MessagesPage() {
-  const [activeChannel, setActiveChannel] = useState("general");
+  const queryClient = useQueryClient();
+  const [activeChatId, setActiveChatId] = useState("");
   const [input, setInput] = useState("");
-
-  const { data } = useQuery({
-    queryKey: ["messages-data"],
-    queryFn: async () => {
-      const res = await apiClient.get("/messages");
-      return res.data;
-    },
-  });
-
-  const channels = data?.channels || [
-    { id: "ch-1", name: "general", unread: 2 },
-    { id: "ch-2", name: "announcements", unread: 0 },
-    { id: "ch-3", name: "engineering", unread: 5 },
-    { id: "ch-4", name: "design-feedback", unread: 0 },
-  ];
-
-  const directMessages = data?.directMessages || [
-    { id: "dm-1", name: "Sarah Chen", status: "online" },
-    { id: "dm-2", name: "Marcus Vance", status: "offline" },
-    { id: "dm-3", name: "Elena Rostova", status: "online" },
-  ];
-
-  const [messages, setMessages] = useState(
-    data?.messages || [
-      {
-        id: "m-1",
-        sender: "Sarah Chen",
-        time: "10:14 AM",
-        text: "Hey team! The brand refresh designs for CommandDesk V2 have been uploaded to Figma. Take a look when you get a chance!",
-      },
-      {
-        id: "m-2",
-        sender: "Alex Rivera",
-        time: "10:18 AM",
-        text: "Awesome work Sarah! Looking forward to reviewing the sidebar dark mode components.",
-      },
-      {
-        id: "m-3",
-        sender: "Marcus Vance",
-        time: "10:25 AM",
-        text: "Deployment pipeline for staging is updated. All unit tests passing cleanly 🚀",
-      },
-    ]
-  );
-
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages((prev: any) => [
-      ...prev,
-      {
-        id: `m-${Date.now()}`,
-        sender: "Alex Rivera",
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        text: input,
-      },
-    ]);
-    setInput("");
-  };
-
-  return (
-    <DashboardLayout>
-      <div className="flex h-[calc(100vh-6rem)] rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-        {/* Sidebar Channel List */}
-        <div className="w-64 border-r border-border bg-card p-4 flex flex-col space-y-6">
-          <div className="flex items-center gap-2 text-foreground font-bold text-lg">
-            <MessageSquare className="h-5 w-5 text-teal" /> Team Chat
-          </div>
-
-          {/* Channels Section */}
-          <div>
-            <div className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Channels
-            </div>
-            <div className="space-y-1">
-              {channels.map((ch: any) => (
-                <button
-                  key={ch.id}
-                  onClick={() => setActiveChannel(ch.name)}
-                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
-                    activeChannel === ch.name
-                      ? "bg-teal text-white font-semibold"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <Hash className="h-3.5 w-3.5" /> {ch.name}
-                  </span>
-                  {ch.unread > 0 && activeChannel !== ch.name && (
-                    <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                      {ch.unread}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Direct Messages Section */}
-          <div>
-            <div className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Direct Messages
-            </div>
-            <div className="space-y-1">
-              {directMessages.map((dm: any) => (
-                <button
-                  key={dm.id}
-                  onClick={() => setActiveChannel(dm.name)}
-                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
-                    activeChannel === dm.name
-                      ? "bg-teal text-white font-semibold"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <Circle
-                      className={`h-2.5 w-2.5 fill-current ${
-                        dm.status === "online" ? "text-emerald-500" : "text-muted-foreground"
-                      }`}
-                    />
-                    {dm.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Chat Feed */}
-        <div className="flex-1 flex flex-col">
-          {/* Header */}
-          <div className="flex h-14 items-center justify-between border-b border-border px-6">
-            <div className="flex items-center gap-2 font-semibold text-foreground text-sm">
-              <Hash className="h-4 w-4 text-teal" /> {activeChannel}
-            </div>
-            <MoreVertical className="h-4 w-4 text-muted-foreground cursor-pointer" />
-          </div>
-
-          {/* Messages Container */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {messages.map((m: any) => (
-              <div key={m.id} className="flex gap-3">
-                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-teal/10 font-bold text-teal text-xs">
-                  {m.sender.charAt(0)}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-foreground text-xs">{m.sender}</span>
-                    <span className="text-[10px] text-muted-foreground">{m.time}</span>
-                  </div>
-                  <p className="mt-1 text-sm text-foreground leading-relaxed">{m.text}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Input Box */}
-          <div className="p-4 border-t border-border">
-            <div className="flex items-center gap-2 rounded-2xl border border-input bg-card p-2">
-              <input
-                type="text"
-                placeholder={`Message #${activeChannel}...`}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                className="flex-1 bg-transparent px-3 py-1 text-sm text-foreground focus:outline-none"
-              />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim()}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal text-white transition hover:opacity-90 disabled:opacity-40"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </DashboardLayout>
-  );
+  const [search, setSearch] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [groupName, setGroupName] = useState("");
+  const query = useQuery<ChatData>({ queryKey: ["messages-data", activeChatId], queryFn: () => apiClient.get(`/messages${activeChatId ? `?chatId=${activeChatId}` : ""}`).then((response) => response.data), refetchInterval: 10000 });
+  const chats = query.data?.chats ?? [];
+  useEffect(() => { if (!activeChatId && chats[0]?.id) setActiveChatId(chats[0].id); }, [activeChatId, chats]);
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["messages-data"] });
+  const send = useMutation({ mutationFn: () => apiClient.post("/messages", { chatId: activeChatId, content: input }), onSuccess: async () => { setInput(""); await refresh(); } });
+  const createChat = useMutation({ mutationFn: () => apiClient.post("/messages", { action: "createChat", participantIds: selectedUsers, name: groupName }), onSuccess: async (response) => { setActiveChatId(response.data.id); setSelectedUsers([]); setGroupName(""); setShowNew(false); await refresh(); } });
+  const selectChat = async (id: string) => { setActiveChatId(id); await apiClient.patch("/messages", { chatId: id }); refresh(); };
+  const filteredChats = useMemo(() => chats.filter((item) => !search.trim() || `${item.name} ${item.lastMessage}`.toLowerCase().includes(search.toLowerCase())), [chats, search]);
+  const activeChat = chats.find((item) => item.id === activeChatId);
+  function submit(event: FormEvent) { event.preventDefault(); if (input.trim() && activeChatId) send.mutate(); }
+  return <DashboardLayout><div className="flex h-[calc(100vh-6rem)] overflow-hidden rounded-2xl border bg-card shadow-sm">
+    <aside className="flex w-72 shrink-0 flex-col border-r">
+      <div className="border-b p-4"><div className="flex items-center justify-between"><span className="flex items-center gap-2 font-bold"><MessageSquare className="h-5 w-5 text-teal" /> Messages</span><button onClick={() => setShowNew(true)} className="rounded-lg bg-teal p-2 text-white" title="New conversation"><Plus className="h-4 w-4" /></button></div><div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search conversations..." className="w-full rounded-xl border py-2 pl-9 pr-3 text-xs" /></div></div>
+      <div className="flex-1 overflow-y-auto p-2">{query.isLoading && !query.data ? <p className="p-4 text-xs text-muted-foreground">Loading conversations...</p> : filteredChats.map((chat) => <button key={chat.id} onClick={() => selectChat(chat.id)} className={`mb-1 flex w-full items-center gap-3 rounded-xl p-3 text-left ${activeChatId === chat.id ? "bg-teal text-white" : "hover:bg-muted"}`}><div className={`flex h-9 w-9 items-center justify-center rounded-full ${activeChatId === chat.id ? "bg-white/20" : "bg-teal/10 text-teal"}`}>{chat.isGroup ? <Users className="h-4 w-4" /> : chat.name.charAt(0)}</div><div className="min-w-0 flex-1"><div className="flex justify-between gap-2"><span className="truncate text-xs font-semibold">{chat.name}</span>{chat.unread > 0 && <span className="rounded-full bg-danger px-1.5 text-[10px] font-bold text-white">{chat.unread}</span>}</div><p className={`truncate text-[10px] ${activeChatId === chat.id ? "text-white/75" : "text-muted-foreground"}`}>{chat.lastMessage || "Start the conversation"}</p></div></button>)}{!query.isLoading && filteredChats.length === 0 && <p className="p-6 text-center text-xs text-muted-foreground">No conversations yet.</p>}</div>
+    </aside>
+    <section className="flex min-w-0 flex-1 flex-col">{activeChat ? <><header className="flex h-16 items-center border-b px-6"><h2 className="font-semibold">{activeChat.name}</h2></header><div className="flex-1 space-y-4 overflow-y-auto p-6">{(query.data?.messages ?? []).map((message) => { const mine = message.senderId === query.data?.currentUserId; return <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`max-w-[75%] rounded-2xl px-4 py-3 ${mine ? "bg-teal text-white" : "bg-muted"}`}><div className={`mb-1 text-[10px] font-semibold ${mine ? "text-white/75" : "text-muted-foreground"}`}>{mine ? "You" : `${message.sender.firstName} ${message.sender.lastName}`} · {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div><p className="whitespace-pre-wrap text-sm">{message.content}</p></div></div>})}{!query.isLoading && !(query.data?.messages ?? []).length && <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No messages yet. Say hello!</div>}</div><form onSubmit={submit} className="border-t p-4"><div className="flex gap-2 rounded-2xl border p-2"><input value={input} onChange={(event) => setInput(event.target.value)} placeholder={`Message ${activeChat.name}...`} className="flex-1 bg-transparent px-3 text-sm outline-none" /><button disabled={!input.trim() || send.isPending} className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal text-white disabled:opacity-40"><Send className="h-4 w-4" /></button></div>{send.error && <p className="mt-2 text-xs text-red-600">{send.error.message}</p>}</form></> : <div className="flex h-full flex-col items-center justify-center text-muted-foreground"><MessageSquare className="mb-3 h-12 w-12 opacity-30" /><p>Select or create a conversation.</p></div>}</section>
+    {showNew && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form onSubmit={(event) => { event.preventDefault(); createChat.mutate(); }} className="w-full max-w-md rounded-2xl bg-card p-5 shadow-xl"><div className="mb-4 flex justify-between"><h2 className="font-semibold">New conversation</h2><button type="button" onClick={() => setShowNew(false)}><X className="h-5 w-5" /></button></div><div className="max-h-64 space-y-2 overflow-y-auto">{(query.data?.users ?? []).map((user) => <label key={user.id} className="flex cursor-pointer items-center gap-3 rounded-xl border p-3"><input type="checkbox" checked={selectedUsers.includes(user.id)} onChange={(event) => setSelectedUsers((current) => event.target.checked ? [...current, user.id] : current.filter((id) => id !== user.id))} /><span className="text-sm">{user.firstName} {user.lastName}</span></label>)}</div>{selectedUsers.length > 1 && <label className="mt-3 block text-sm font-medium">Group name<input required value={groupName} onChange={(event) => setGroupName(event.target.value)} className="mt-1 h-10 w-full rounded-xl border px-3" /></label>}{createChat.error && <p className="mt-2 text-xs text-red-600">{createChat.error.message}</p>}<div className="mt-4 flex justify-end"><button disabled={!selectedUsers.length || createChat.isPending} className="rounded-xl bg-teal px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{createChat.isPending ? "Creating..." : "Start Conversation"}</button></div></form></div>}
+  </div></DashboardLayout>;
 }

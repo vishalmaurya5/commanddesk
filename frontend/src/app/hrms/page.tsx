@@ -1,258 +1,53 @@
 "use client";
-
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { FormEvent, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Award, BookOpen, ExternalLink, FileText, Laptop, Pencil, Plus, Search, Trash2, UserCircle, X } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { apiClient } from "@/lib/api-client";
-import {
-  UserCircle,
-  FileText,
-  Award,
-  Laptop,
-  CheckCircle2,
-  Users,
-  ShieldAlert,
-  Plus,
-  ArrowRight,
-  BookOpen,
-} from "lucide-react";
 
+type Tab = "policies" | "assets" | "trainings" | "documents";
+type Doc = { id: string; name: string; description?: string | null; fileUrl?: string | null; fileType?: string | null };
+type Asset = { id: string; name: string; type: string; serialNumber?: string | null; model?: string | null; brand?: string | null; value?: number | null; status: string; userId: string; user?: { id: string; firstName: string; lastName: string } };
+type Employee = { id: string; firstName: string; lastName: string };
+const empty = { name: "", description: "", fileUrl: "", fileType: "", type: "", serialNumber: "", model: "", brand: "", value: "", status: "ASSIGNED", userId: "" };
+const singular: Record<Tab, string> = { policies: "policy", assets: "asset", trainings: "training", documents: "document" };
 export default function HrmsPage() {
-  const [activeTab, setActiveTab] = useState<"policies" | "documents" | "trainings" | "assets">("policies");
-
-  const { data: hrmsData, isLoading } = useQuery({
-    queryKey: ["hrms-all"],
-    queryFn: async () => {
-      const res = await apiClient.get("/hrms");
-      return res.data;
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState<Tab>("policies");
+  const [search, setSearch] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState("");
+  const [form, setForm] = useState(empty);
+  const query = useQuery<{ policies: Doc[]; assets: Asset[]; trainings: Doc[]; documents: Doc[] }>({ queryKey: ["hrms-all"], queryFn: () => apiClient.get("/hrms").then((response) => response.data) });
+  const employeesQuery = useQuery<Employee[]>({ queryKey: ["employees", "hrms-assets"], queryFn: () => apiClient.get("/employees").then((response) => response.data) });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["hrms-all"] });
+  const save = useMutation({
+    mutationFn: () => {
+      const type = singular[tab];
+      const data = type === "asset" ? { name: form.name, type: form.type, serialNumber: form.serialNumber, model: form.model, brand: form.brand, value: form.value ? Number(form.value) : undefined, status: form.status, userId: form.userId } : type === "training" ? { name: form.name, title: form.name, description: form.description } : { name: form.name, description: form.description, fileUrl: form.fileUrl, fileType: form.fileType };
+      return editingId ? apiClient.patch("/hrms", { id: editingId, type, data }) : apiClient.post("/hrms", { type, data });
     },
+    onSuccess: async () => { await refresh(); close(); },
   });
-
-  const policies = hrmsData?.policies || [
-    { id: "pol-1", name: "Remote Work & Flexible Hours Policy", description: "Guidelines for remote work eligibility, Core hours, and home office stipend.", folder: "POLICY" },
-    { id: "pol-2", name: "Annual Leave & Health Benefits Guidelines", description: "Overview of paid time off accrual, sick leaves, and medical coverage benefits.", folder: "POLICY" },
-    { id: "pol-3", name: "Code of Conduct & Data Security 2026", description: "Information security standards, data privacy, and workplace ethics protocol.", folder: "POLICY" },
-  ];
-
-  const documents = hrmsData?.documents || [
-    { id: "doc-1", name: "Employee Onboarding Checklist 2026.pdf", fileType: "pdf", description: "Standard welcome pack and verification list" },
-    { id: "doc-2", name: "Standard NDA Agreement Template.docx", fileType: "docx", description: "Legal non-disclosure agreement for new contracts" },
-  ];
-
-  const trainings = hrmsData?.trainings || [
-    { id: "tr-1", name: "Cybersecurity Essentials & Anti-Phishing 2026", description: "Mandatory annual security awareness training for all employees." },
-    { id: "tr-2", name: "Leadership Development & Team Dynamics", description: "Workshop series on effective communication and engineering management." },
-  ];
-
-  const assets = hrmsData?.assets || [
-    { id: "ast-1", name: 'MacBook Pro 16" M3 Max', type: "Laptop", serialNumber: "C02G1829MD6", user: { firstName: "Alex", lastName: "Rivera" } },
-    { id: "ast-2", name: "Dell UltraSharp 27 4K Monitor", type: "Display", serialNumber: "CN-0982-A00", user: { firstName: "Sarah", lastName: "Chen" } },
-    { id: "ast-3", name: "Keychron K2 Mechanical Keyboard", type: "Peripheral", serialNumber: "KC-89210", user: { firstName: "Marcus", lastName: "Vance" } },
-  ];
-
-  return (
-    <DashboardLayout>
-      <div className="space-y-7">
-        {/* Header Banner */}
-        <section className="relative overflow-hidden rounded-[28px] bg-midnight-navy px-6 py-7 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] sm:px-8">
-          <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-primary-indigo/50 blur-3xl" />
-          <div className="absolute right-32 top-10 h-32 w-32 rounded-full bg-premium-teal/30 blur-3xl" />
-          <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-slate-200 backdrop-blur">
-                <UserCircle className="h-3.5 w-3.5 text-teal-300" />
-                Human Resource Management
-              </div>
-              <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                HRMS Portal
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                Manage company policies, training programs, employee assets, and HR documentation in one unified hub.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Quick Stats Grid */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-xs font-medium">Company Policies</span>
-              <BookOpen className="h-4 w-4 text-teal" />
-            </div>
-            <div className="mt-3 text-3xl font-bold text-foreground">{policies.length}</div>
-            <span className="text-xs text-muted-foreground">Active compliance docs</span>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-xs font-medium">Assigned Assets</span>
-              <Laptop className="h-4 w-4 text-indigo-500" />
-            </div>
-            <div className="mt-3 text-3xl font-bold text-foreground">{assets.length}</div>
-            <span className="text-xs text-emerald-500">100% accounted for</span>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-xs font-medium">Active Trainings</span>
-              <Award className="h-4 w-4 text-amber-500" />
-            </div>
-            <div className="mt-3 text-3xl font-bold text-foreground">{trainings.length}</div>
-            <span className="text-xs text-muted-foreground">Enrolled team members</span>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-xs font-medium">HR Documents</span>
-              <FileText className="h-4 w-4 text-blue-500" />
-            </div>
-            <div className="mt-3 text-3xl font-bold text-foreground">{documents.length}</div>
-            <span className="text-xs text-muted-foreground">Official repository</span>
-          </div>
-        </div>
-
-        {/* Tab Navigation & Content */}
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <div className="mb-6 flex border-b border-border space-x-6">
-            <button
-              onClick={() => setActiveTab("policies")}
-              className={`pb-3 text-sm font-semibold transition border-b-2 ${
-                activeTab === "policies"
-                  ? "border-teal text-teal"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Policies ({policies.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("assets")}
-              className={`pb-3 text-sm font-semibold transition border-b-2 ${
-                activeTab === "assets"
-                  ? "border-teal text-teal"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Asset Allocation ({assets.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("trainings")}
-              className={`pb-3 text-sm font-semibold transition border-b-2 ${
-                activeTab === "trainings"
-                  ? "border-teal text-teal"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Trainings ({trainings.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("documents")}
-              className={`pb-3 text-sm font-semibold transition border-b-2 ${
-                activeTab === "documents"
-                  ? "border-teal text-teal"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Documents ({documents.length})
-            </button>
-          </div>
-
-          {/* Policies View */}
-          {activeTab === "policies" && (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {policies.map((pol: any) => (
-                <div key={pol.id} className="rounded-xl border border-border p-4 hover:border-teal/50 transition bg-card">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal/10 text-teal">
-                      <BookOpen className="h-5 w-5" />
-                    </div>
-                    <div className="font-semibold text-foreground text-sm line-clamp-1">{pol.name}</div>
-                  </div>
-                  <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
-                    {pol.description}
-                  </p>
-                  <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs text-teal font-medium cursor-pointer hover:underline">
-                    <span>Read Full Policy</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Assets View */}
-          {activeTab === "assets" && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
-                    <th className="pb-3 font-medium">Asset Name</th>
-                    <th className="pb-3 font-medium">Category</th>
-                    <th className="pb-3 font-medium">Serial Number</th>
-                    <th className="pb-3 font-medium">Assigned To</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {assets.map((ast: any) => (
-                    <tr key={ast.id} className="hover:bg-muted/30">
-                      <td className="py-3 font-medium text-foreground">{ast.name}</td>
-                      <td className="py-3 text-muted-foreground">{ast.type}</td>
-                      <td className="py-3 font-mono text-xs text-muted-foreground">{ast.serialNumber}</td>
-                      <td className="py-3 font-medium text-foreground">
-                        {ast.user ? `${ast.user.firstName} ${ast.user.lastName}` : "Unassigned"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Trainings View */}
-          {activeTab === "trainings" && (
-            <div className="space-y-4">
-              {trainings.map((tr: any) => (
-                <div key={tr.id} className="flex items-center justify-between rounded-xl border border-border p-4 bg-card">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
-                      <Award className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="font-semibold text-foreground text-sm">{tr.name}</div>
-                      <div className="text-xs text-muted-foreground">{tr.description}</div>
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-500">
-                    Active Module
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Documents View */}
-          {activeTab === "documents" && (
-            <div className="space-y-4">
-              {documents.map((doc: any) => (
-                <div key={doc.id} className="flex items-center justify-between rounded-xl border border-border p-4 bg-card">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="font-semibold text-foreground text-sm">{doc.name}</div>
-                      <div className="text-xs text-muted-foreground">{doc.description}</div>
-                    </div>
-                  </div>
-                  <button className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted">
-                    Download
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </DashboardLayout>
-  );
+  const remove = useMutation({ mutationFn: ({ id, type }: { id: string; type: string }) => apiClient.delete(`/hrms?id=${id}&type=${type}`), onSuccess: refresh });
+  const data = query.data ?? { policies: [], assets: [], trainings: [], documents: [] };
+  const records = useMemo(() => (data[tab] ?? []).filter((item) => !search.trim() || `${item.name} ${"description" in item ? item.description ?? "" : ""} ${"type" in item ? item.type : ""}`.toLowerCase().includes(search.toLowerCase())), [data, search, tab]);
+  function close() { setShowForm(false); setEditingId(""); setForm(empty); }
+  function add() { close(); setForm({ ...empty, userId: employeesQuery.data?.[0]?.id ?? "" }); setShowForm(true); }
+  function edit(record: Doc | Asset) {
+    setEditingId(record.id);
+    if ("type" in record) setForm({ ...empty, name: record.name, type: record.type, serialNumber: record.serialNumber ?? "", model: record.model ?? "", brand: record.brand ?? "", value: record.value == null ? "" : String(record.value), status: record.status, userId: record.userId });
+    else setForm({ ...empty, name: record.name, description: record.description ?? "", fileUrl: record.fileUrl ?? "", fileType: record.fileType ?? "" });
+    setShowForm(true);
+  }
+  function submit(event: FormEvent) { event.preventDefault(); save.mutate(); }
+  const stats = [{ label: "Company Policies", value: data.policies.length, icon: BookOpen }, { label: "Assigned Assets", value: data.assets.length, icon: Laptop }, { label: "Active Trainings", value: data.trainings.length, icon: Award }, { label: "HR Documents", value: data.documents.length, icon: FileText }];
+  return <DashboardLayout><div className="space-y-7">
+    <section className="rounded-[28px] bg-midnight-navy px-6 py-7 text-white"><div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between"><div><div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs"><UserCircle className="h-3.5 w-3.5 text-teal-300" />Human Resource Management</div><h1 className="text-3xl font-bold">HRMS Portal</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">Manage policies, training programs, assigned assets and HR documents.</p></div><button onClick={add} className="flex items-center gap-2 rounded-xl bg-teal px-5 py-3 font-semibold"><Plus className="h-4 w-4" /> Add {singular[tab]}</button></div></section>
+    {showForm && <form onSubmit={submit} className="rounded-2xl border bg-card p-5 shadow-sm"><div className="mb-4 flex justify-between"><h2 className="font-semibold">{editingId ? "Edit" : "Add"} {singular[tab]}</h2><button type="button" onClick={close}><X className="h-5 w-5" /></button></div><div className="grid gap-4 md:grid-cols-2"><label className="text-sm font-medium">Name<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label>{tab === "assets" ? <><label className="text-sm font-medium">Category<input required value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })} placeholder="Laptop, phone, display..." className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Assigned employee<select required value={form.userId} onChange={(event) => setForm({ ...form, userId: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3"><option value="">Select employee</option>{(employeesQuery.data ?? []).map((employee) => <option key={employee.id} value={employee.id}>{employee.firstName} {employee.lastName}</option>)}</select></label><label className="text-sm font-medium">Serial number<input value={form.serialNumber} onChange={(event) => setForm({ ...form, serialNumber: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Brand<input value={form.brand} onChange={(event) => setForm({ ...form, brand: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Model<input value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Value<input type="number" min="0" step="0.01" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Status<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3"><option>ASSIGNED</option><option>IN_REPAIR</option><option>RETURNED</option><option>LOST</option></select></label></> : <><label className="text-sm font-medium md:col-span-2">Description<textarea rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2" /></label>{tab === "documents" && <><label className="text-sm font-medium">Document URL<input required type="url" value={form.fileUrl} onChange={(event) => setForm({ ...form, fileUrl: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">File type<input value={form.fileType} onChange={(event) => setForm({ ...form, fileType: event.target.value })} placeholder="pdf, docx..." className="mt-1 h-11 w-full rounded-xl border px-3" /></label></>}</>}</div>{save.error && <p className="mt-3 text-sm text-red-600">{save.error.message}</p>}<div className="mt-4 flex justify-end gap-3"><button type="button" onClick={close} className="rounded-xl border px-4 py-2">Cancel</button><button disabled={save.isPending || (tab === "assets" && !form.userId)} className="rounded-xl bg-primary-indigo px-5 py-2 font-semibold text-white disabled:opacity-50">{save.isPending ? "Saving..." : editingId ? "Update" : "Create"}</button></div></form>}
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{stats.map(({ label,value,icon: Icon }) => <div key={label} className="rounded-2xl border bg-card p-5 shadow-sm"><div className="flex justify-between text-xs text-muted-foreground"><span>{label}</span><Icon className="h-4 w-4 text-teal" /></div><div className="mt-3 text-3xl font-bold">{value}</div></div>)}</div>
+    <div className="rounded-2xl border bg-card p-6 shadow-sm"><div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="flex gap-4 overflow-auto">{(["policies","assets","trainings","documents"] as Tab[]).map((item) => <button key={item} onClick={() => { setTab(item); close(); }} className={`border-b-2 pb-2 text-sm font-semibold capitalize ${tab === item ? "border-teal text-teal" : "border-transparent text-muted-foreground"}`}>{item} ({data[item].length})</button>)}</div><div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${tab}...`} className="rounded-xl border py-2 pl-9 pr-3 text-sm" /></div></div>
+      {query.isLoading ? <div className="py-12 text-center text-muted-foreground">Loading HRMS records...</div> : query.error ? <div className="text-red-600">{query.error.message}</div> : <div className="space-y-3">{records.map((record) => <div key={record.id} className="flex items-center justify-between gap-4 rounded-xl border p-4"><div className="min-w-0"><h3 className="truncate text-sm font-semibold">{record.name}</h3>{"type" in record ? <p className="text-xs text-muted-foreground">{record.type} · {record.user ? `${record.user.firstName} ${record.user.lastName}` : "Unassigned"} · {record.status}</p> : <p className="text-xs text-muted-foreground">{record.description || "No description"}</p>}</div><div className="flex shrink-0 gap-2">{"fileUrl" in record && record.fileUrl && <a href={record.fileUrl} target="_blank" rel="noreferrer" title="Open"><ExternalLink className="h-4 w-4" /></a>}<button onClick={() => edit(record)} title="Edit"><Pencil className="h-4 w-4" /></button><button onClick={() => window.confirm(`Delete this ${singular[tab]}?`) && remove.mutate({ id: record.id, type: singular[tab] })} title="Delete" className="hover:text-red-600"><Trash2 className="h-4 w-4" /></button></div></div>)}{records.length === 0 && <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">No {tab} found. Use “Add {singular[tab]}” to create one.</div>}</div>}
+    </div>
+  </div></DashboardLayout>;
 }

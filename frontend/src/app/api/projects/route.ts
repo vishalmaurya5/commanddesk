@@ -1,35 +1,47 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { ProjectService } from "@/lib/services/project-service";
+import { authorize } from "@/lib/saas/authorize";
+import { apiError } from "@/lib/saas/api-error";
+import { PERMISSIONS } from "@/lib/saas/permissions";
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const projects = await ProjectService.getAll((session.user as any).companyId);
+    const { companyId } = await authorize(PERMISSIONS.PROJECTS_VIEW);
+    const projects = await ProjectService.getAll(companyId);
     return NextResponse.json(projects);
   } catch (error) {
-    console.error("Error fetching projects:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError(error, "Unable to load projects");
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { companyId } = await authorize(PERMISSIONS.PROJECTS_MANAGE);
+    const body = (await request.json()) as {
+      name?: string;
+      description?: string;
+      leadId?: string;
+      priority?: string;
+      startDate?: string;
+      endDate?: string;
+    };
+    if (!body.name?.trim() || !body.leadId) {
+      return NextResponse.json(
+        { error: "Project name and lead are required" },
+        { status: 400 },
+      );
     }
-    const body = await request.json();
     const project = await ProjectService.create({
       ...body,
-      companyId: (session.user as any).companyId,
+      name: body.name.trim(),
+      description: body.description?.trim(),
+      startDate: body.startDate ? new Date(body.startDate) : undefined,
+      endDate: body.endDate ? new Date(body.endDate) : undefined,
+      leadId: body.leadId,
+      companyId,
     });
     return NextResponse.json(project, { status: 201 });
   } catch (error) {
-    console.error("Error creating project:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError(error, "Unable to create project");
   }
 }

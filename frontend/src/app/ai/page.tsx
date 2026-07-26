@@ -29,7 +29,7 @@ export default function AiPage() {
     {
       id: "msg-0",
       sender: "ai",
-      text: "Hello! I am your CommandDesk AI Assistant. How can I help you manage employee policies, summarize project status, or run financial analytics today?",
+      text: "Hello! I am your SOLUBRIX AI Assistant. How can I help you manage employee policies, summarize project status, or run financial analytics today?",
       timestamp: "10:00 AM",
     },
   ]);
@@ -86,7 +86,7 @@ export default function AiPage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold tracking-tight text-white">
-                  CommandDesk AI Assistant
+                  SOLUBRIX AI Assistant
                 </h1>
                 <p className="text-xs text-slate-300">
                   Powered intelligence for enterprise operations & data analytics

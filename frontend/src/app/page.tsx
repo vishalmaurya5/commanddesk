@@ -4,11 +4,11 @@ import { RevenueChart } from "@/components/dashboard/revenue-chart";
 import Link from "next/link";
 
 const quickActionRoutes: Record<string, string> = {
-  "New Project": "/projects?create=1",
-  "Add Employee": "/employees?create=1",
-  "Create Invoice": "/finance/invoices?create=1",
-  "New Task": "/tasks?create=1",
-  "Add Lead": "/leads?create=1",
+  "New Project": "/projects",
+  "Add Employee": "/employees",
+  "Create Invoice": "/finance",
+  "New Task": "/tasks",
+  "Add Lead": "/crm",
   "Run Report": "/analytics",
 };
 
@@ -102,7 +102,8 @@ export default function Home() {
               <Link
                 key={i}
                 href={quickActionRoutes[action.label]}
-                className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-4 transition-all hover:border-primary-indigo/20 hover:shadow-md hover:-translate-y-0.5 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-primary-indigo/40"
+                aria-label={`${action.label} — open module`}
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-primary-indigo/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-indigo focus-visible:ring-offset-2 active:translate-y-0 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-primary-indigo/40"
               >
                 <span className="text-2xl">{action.icon}</span>
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-300">

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { LeadService } from "@/lib/services/lead-service";
+import { authorize } from "@/lib/saas/authorize";
+import { apiError } from "@/lib/saas/api-error";
+import { PERMISSIONS } from "@/lib/saas/permissions";
+
+const STATUSES = new Set(["NEW", "CONTACTED", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON", "LOST"]);
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -11,18 +16,17 @@ export async function GET(
   { params }: Params
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const lead = await LeadService.getById((await params).id);
+    const { companyId } = await authorize(PERMISSIONS.CRM_VIEW);
+    const { id } = await params;
+    const owned = await prisma.lead.findFirst({ where: { id, companyId }, select: { id: true } });
+    if (!owned) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+    const lead = await LeadService.getById(id);
     if (!lead) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
     return NextResponse.json(lead);
   } catch (error) {
-    console.error("Error fetching lead:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError(error, "Unable to load lead");
   }
 }
 
@@ -31,20 +35,21 @@ export async function PATCH(
   { params }: Params
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { companyId } = await authorize(PERMISSIONS.CRM_MANAGE);
+    const { id } = await params;
+    const owned = await prisma.lead.findFirst({ where: { id, companyId }, select: { id: true } });
+    if (!owned) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     const body = await request.json();
+    if (body.status && !STATUSES.has(body.status)) return NextResponse.json({ error: "Invalid lead status" }, { status: 400 });
     if (body.action === "convert") {
-      const client = await LeadService.convertToClient((await params).id, body.clientData);
+      const client = await LeadService.convertToClient(id, body.clientData);
       return NextResponse.json(client);
     }
-    const lead = await LeadService.update((await params).id, body);
+    const { action: _action, clientData: _clientData, companyId: _companyId, ...updates } = body;
+    const lead = await LeadService.update(id, updates);
     return NextResponse.json(lead);
   } catch (error) {
-    console.error("Error updating lead:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError(error, "Unable to update lead");
   }
 }
 
@@ -53,14 +58,13 @@ export async function DELETE(
   { params }: Params
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    await LeadService.delete((await params).id);
+    const { companyId } = await authorize(PERMISSIONS.CRM_MANAGE);
+    const { id } = await params;
+    const owned = await prisma.lead.findFirst({ where: { id, companyId }, select: { id: true } });
+    if (!owned) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+    await LeadService.delete(id);
     return NextResponse.json({ message: "Lead deleted successfully" });
   } catch (error) {
-    console.error("Error deleting lead:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError(error, "Unable to delete lead");
   }
 }

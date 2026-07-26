@@ -36,12 +36,15 @@ export class EmployeeService {
     departmentId?: string;
     designation?: string;
     phone?: string;
+    authUserId?: string;
   }) {
     return prisma.user.create({
       data: {
         email: data.email,
+        authUserId: data.authUserId,
         firstName: data.firstName,
         lastName: data.lastName,
+        phone: data.phone,
         role: data.role as any,
         companyId: data.companyId,
         departmentId: data.departmentId,
@@ -52,7 +55,26 @@ export class EmployeeService {
           },
         },
       },
-      include: { department: true, employeeProfile: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        employeeProfile: {
+          select: {
+            designation: true,
+          },
+        },
+      },
     });
   }
 

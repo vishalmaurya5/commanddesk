@@ -1,52 +1,40 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { authorize } from "@/lib/saas/authorize";
+import { apiError } from "@/lib/saas/api-error";
+import { PERMISSIONS } from "@/lib/saas/permissions";
 
 export async function GET() {
   try {
-    const tickets = [
-      {
-        id: "t-101",
-        subject: "SSO Login authentication timeout on mobile client",
-        category: "Authentication",
-        priority: "HIGH",
-        status: "OPEN",
-        createdAt: "2026-07-26T08:30:00Z",
-        requester: "Sarah Chen",
-        assignee: "Alex Rivera",
-      },
-      {
-        id: "t-102",
-        subject: "Exporting custom PDF report takes longer than 30s",
-        category: "Reporting",
-        priority: "MEDIUM",
-        status: "IN_PROGRESS",
-        createdAt: "2026-07-25T14:15:00Z",
-        requester: "Marcus Vance",
-        assignee: "DevOps Team",
-      },
-      {
-        id: "t-103",
-        subject: "Update employee department permissions for Q3",
-        category: "User Access",
-        priority: "LOW",
-        status: "RESOLVED",
-        createdAt: "2026-07-24T11:00:00Z",
-        requester: "Elena Rostova",
-        assignee: "HR Ops",
-      },
-      {
-        id: "t-104",
-        subject: "Stripe webhook notification delay on invoice payment",
-        category: "Billing",
-        priority: "URGENT",
-        status: "OPEN",
-        createdAt: "2026-07-26T09:00:00Z",
-        requester: "Acme Corp Admin",
-        assignee: "Finance Engineering",
-      },
-    ];
+    const { companyId } = await authorize(PERMISSIONS.SUPPORT_VIEW);
+    const tickets = await prisma.ticket.findMany({ where: { companyId }, include: { createdBy: { select: { firstName: true, lastName: true } }, assignedTo: { select: { firstName: true, lastName: true } }, _count: { select: { comments: true } } }, orderBy: { createdAt: "desc" } });
+    return NextResponse.json({ tickets: tickets.map((item) => ({ ...item, subject: item.title, requester: `${item.createdBy.firstName} ${item.createdBy.lastName}`, assignee: item.assignedTo ? `${item.assignedTo.firstName} ${item.assignedTo.lastName}` : "Unassigned" })) });
+  } catch (error) { return apiError(error, "Unable to load support tickets"); }
+}
 
-    return NextResponse.json({ tickets });
-  } catch (error) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
+export async function POST(request: Request) {
+  try {
+    const { companyId, userId } = await authorize(PERMISSIONS.SUPPORT_MANAGE);
+    const body = await request.json();
+    if (!body.title?.trim() || !body.description?.trim()) return NextResponse.json({ error: "Title and description are required" }, { status: 400 });
+    if (body.assignedToId) {
+      const user = await prisma.user.findFirst({ where: { id: body.assignedToId, companyId, isActive: true }, select: { id: true } });
+      if (!user) return NextResponse.json({ error: "Assignee not found" }, { status: 404 });
+    }
+    return NextResponse.json(await prisma.ticket.create({ data: { companyId, createdById: userId, title: body.title.trim(), description: body.description.trim(), category: body.category || null, priority: body.priority || "MEDIUM", assignedToId: body.assignedToId || null } }), { status: 201 });
+  } catch (error) { return apiError(error, "Unable to create ticket"); }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const { companyId, userId } = await authorize(PERMISSIONS.SUPPORT_MANAGE);
+    const body = await request.json();
+    const ticket = await prisma.ticket.findFirst({ where: { id: body.id, companyId }, select: { id: true } });
+    if (!ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+    if (body.comment?.trim()) {
+      return NextResponse.json(await prisma.ticketComment.create({ data: { ticketId: body.id, authorId: userId, content: body.comment.trim(), isInternal: Boolean(body.isInternal) } }));
+    }
+    if (body.status && !["OPEN","IN_PROGRESS","RESOLVED","CLOSED"].includes(body.status)) return NextResponse.json({ error: "Invalid ticket status" }, { status: 400 });
+    return NextResponse.json(await prisma.ticket.update({ where: { id: body.id }, data: { status: body.status, priority: body.priority } }));
+  } catch (error) { return apiError(error, "Unable to update ticket"); }
 }

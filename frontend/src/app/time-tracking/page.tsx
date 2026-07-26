@@ -32,7 +32,7 @@ export default function TimeTrackingPage() {
   const queryClient = useQueryClient();
   const [isRunning, setIsRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
-  const [activeProject, setActiveProject] = useState("CommandDesk Core App");
+  const [activeProject, setActiveProject] = useState("SOLUBRIX Core App");
   const [activeTask, setActiveTask] = useState("");
 
   const { data, isLoading } = useQuery({
@@ -129,7 +129,7 @@ export default function TimeTrackingPage() {
                   onChange={(e) => setActiveProject(e.target.value)}
                   className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="CommandDesk Core App">CommandDesk Core App</option>
+                  <option value="SOLUBRIX Core App">SOLUBRIX Core App</option>
                   <option value="HRMS Portal">HRMS Portal</option>
                   <option value="CRM Pipeline">CRM Pipeline</option>
                   <option value="Finance & Invoicing">Finance & Invoicing</option>

@@ -1,87 +1,33 @@
-import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
-import { FinanceService } from "@/lib/services/finance-service";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+"use client";
+import { FormEvent, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ExternalLink, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { DashboardLayout } from "@/components/layout/dashboard-layout";
+import { apiClient } from "@/lib/api-client";
 
-export default async function ExpensesPage() {
-  const session = await auth();
-  const companyId = (session?.user as any)?.companyId;
-  if (!companyId) redirect("/login");
-
-  const expenses = await FinanceService.getExpenses(companyId);
-
-  return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-6xl mx-auto space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Expenses</h1>
-                <p className="text-slate-500">Track and manage company expenditures</p>
-              </div>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" /> Log Expense
-              </Button>
-            </div>
-
-            <div className="bg-white rounded-md border shadow-sm">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Billable</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {expenses.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-6 text-slate-500">
-                        No expenses found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    expenses.map((exp) => (
-                      <TableRow key={exp.id}>
-                        <TableCell className="font-medium">{exp.description}</TableCell>
-                        <TableCell>{exp.category || "General"}</TableCell>
-                        <TableCell>{exp.date.toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          {exp.isBillable ? (
-                            <Badge variant="default" className="bg-blue-500">Yes</Badge>
-                          ) : (
-                            <Badge variant="secondary">No</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-medium text-red-600">
-                          ${exp.amount.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
+type Expense = { id: string; description: string; category?: string | null; date: string; amount: number; receiptUrl?: string | null; notes?: string | null; isBillable: boolean };
+const emptyForm = { description: "", category: "", date: "", amount: "", receiptUrl: "", notes: "", isBillable: false };
+export default function ExpensesPage() {
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState("");
+  const [search, setSearch] = useState("");
+  const [billable, setBillable] = useState("ALL");
+  const [form, setForm] = useState(emptyForm);
+  const query = useQuery<{ expenses: Expense[] }>({ queryKey: ["finance-expenses"], queryFn: () => apiClient.get("/finance").then((response) => response.data) });
+  const refresh = () => { queryClient.invalidateQueries({ queryKey: ["finance-expenses"] }); queryClient.invalidateQueries({ queryKey: ["finance-overview"] }); };
+  const save = useMutation({ mutationFn: () => editingId ? apiClient.patch("/finance", { type: "expense", id: editingId, ...form, amount: Number(form.amount) }) : apiClient.post("/finance", { type: "expense", ...form, amount: Number(form.amount) }), onSuccess: () => { refresh(); closeForm(); } });
+  const remove = useMutation({ mutationFn: (id: string) => apiClient.delete(`/finance?id=${id}`), onSuccess: refresh });
+  const expenses = useMemo(() => (query.data?.expenses ?? []).filter((item) => (billable === "ALL" || String(item.isBillable) === billable) && (!search.trim() || `${item.description} ${item.category ?? ""}`.toLowerCase().includes(search.toLowerCase()))), [billable, query.data, search]);
+  const total = expenses.reduce((sum, item) => sum + item.amount, 0);
+  function closeForm() { setShowForm(false); setEditingId(""); setForm(emptyForm); }
+  function edit(item: Expense) { setEditingId(item.id); setForm({ description: item.description, category: item.category ?? "", date: item.date.slice(0, 10), amount: String(item.amount), receiptUrl: item.receiptUrl ?? "", notes: item.notes ?? "", isBillable: item.isBillable }); setShowForm(true); }
+  function submit(event: FormEvent) { event.preventDefault(); save.mutate(); }
+  return <DashboardLayout><div className="space-y-6">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-3xl font-bold tracking-tight">Expenses</h1><p className="text-muted-foreground">Track and manage company expenditures.</p></div><button onClick={() => { closeForm(); setShowForm(true); }} className="flex items-center gap-2 rounded-xl bg-primary-indigo px-5 py-2.5 font-semibold text-white"><Plus className="h-4 w-4" /> Log Expense</button></div>
+    {showForm && <form onSubmit={submit} className="rounded-2xl border bg-card p-5 shadow-sm"><div className="mb-4 flex justify-between"><h2 className="font-semibold">{editingId ? "Edit expense" : "Log new expense"}</h2><button type="button" onClick={closeForm}><X className="h-5 w-5" /></button></div><div className="grid gap-4 md:grid-cols-2"><label className="text-sm font-medium">Description<input required value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Category<input value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} placeholder="Travel, software, office..." className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Amount<input required type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Date<input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="text-sm font-medium">Receipt URL<input type="url" value={form.receiptUrl} onChange={(event) => setForm({ ...form, receiptUrl: event.target.value })} placeholder="https://..." className="mt-1 h-11 w-full rounded-xl border px-3" /></label><label className="flex items-center gap-2 self-end pb-3 text-sm font-medium"><input type="checkbox" checked={form.isBillable} onChange={(event) => setForm({ ...form, isBillable: event.target.checked })} /> Billable to client</label><label className="text-sm font-medium md:col-span-2">Notes<textarea rows={3} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} className="mt-1 w-full rounded-xl border px-3 py-2" /></label></div>{save.error && <p className="mt-3 text-sm text-red-600">{save.error.message}</p>}<div className="mt-4 flex justify-end gap-3"><button type="button" onClick={closeForm} className="rounded-xl border px-4 py-2">Cancel</button><button disabled={save.isPending} className="rounded-xl bg-primary-indigo px-5 py-2 font-semibold text-white disabled:opacity-50">{save.isPending ? "Saving..." : editingId ? "Update Expense" : "Save Expense"}</button></div></form>}
+    <div className="grid gap-4 sm:grid-cols-3"><div className="rounded-2xl border bg-card p-4"><span className="text-xs text-muted-foreground">Visible expenses</span><div className="mt-1 text-2xl font-bold">{expenses.length}</div></div><div className="rounded-2xl border bg-card p-4"><span className="text-xs text-muted-foreground">Visible total</span><div className="mt-1 text-2xl font-bold text-red-600">${total.toLocaleString()}</div></div><div className="rounded-2xl border bg-card p-4"><span className="text-xs text-muted-foreground">Billable total</span><div className="mt-1 text-2xl font-bold">${expenses.filter((item) => item.isBillable).reduce((sum, item) => sum + item.amount, 0).toLocaleString()}</div></div></div>
+    <div className="flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search description or category..." className="w-full rounded-xl border py-2.5 pl-10 pr-3" /></div><select value={billable} onChange={(event) => setBillable(event.target.value)} className="rounded-xl border px-4"><option value="ALL">All expenses</option><option value="true">Billable</option><option value="false">Non-billable</option></select></div>
+    <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm">{query.isLoading ? <div className="p-12 text-center text-muted-foreground">Loading expenses...</div> : query.error ? <div className="p-4 text-red-600">{query.error.message}</div> : <table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-4">Description</th><th>Category</th><th>Date</th><th>Billable</th><th className="text-right">Amount</th><th className="pr-4 text-right">Actions</th></tr></thead><tbody>{expenses.map((item) => <tr key={item.id} className="border-b last:border-0"><td className="p-4 font-medium">{item.description}</td><td>{item.category || "General"}</td><td>{new Date(item.date).toLocaleDateString()}</td><td>{item.isBillable ? <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-700">Yes</span> : <span className="text-muted-foreground">No</span>}</td><td className="text-right font-semibold text-red-600">${item.amount.toLocaleString()}</td><td><div className="flex justify-end gap-2 pr-4">{item.receiptUrl && <a href={item.receiptUrl} target="_blank" rel="noreferrer" title="Open receipt"><ExternalLink className="h-4 w-4" /></a>}<button onClick={() => edit(item)} title="Edit"><Pencil className="h-4 w-4" /></button><button onClick={() => window.confirm("Delete this expense?") && remove.mutate(item.id)} title="Delete" className="hover:text-red-600"><Trash2 className="h-4 w-4" /></button></div></td></tr>)}{expenses.length === 0 && <tr><td colSpan={6} className="p-12 text-center text-muted-foreground">No expenses found. Use “Log Expense” to add one.</td></tr>}</tbody></table>}</div>
+  </div></DashboardLayout>;
 }

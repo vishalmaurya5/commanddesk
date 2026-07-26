@@ -5,7 +5,7 @@ export async function GET(request: Request) {
     const mockTimeEntries = [
       {
         id: "tt-1",
-        project: "CommandDesk Core App",
+        project: "SOLUBRIX Core App",
         task: "Sidebar Navigation Integration",
         date: "2026-07-26",
         duration: "3h 45m",
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
       totalHoursThisWeek: 34.5,
       billableHours: 29.0,
       activeTimer: {
-        project: "CommandDesk Core App",
+        project: "SOLUBRIX Core App",
         task: "Activating Navigation Sections",
         startTime: "14:15",
         elapsedSeconds: 4320,

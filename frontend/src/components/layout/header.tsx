@@ -14,10 +14,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
-import { useState, useEffect, useRef, type FormEvent } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
 
 interface HeaderProps {
   className?: string;
@@ -26,13 +34,36 @@ interface HeaderProps {
 
 export function Header({ className, onMobileToggle }: HeaderProps) {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const { data: settingsData } = useQuery({
+    queryKey: ["settings-data"],
+    queryFn: () => apiClient.get("/settings").then((response) => response.data),
+  });
+  const { data: notificationData } = useQuery({
+    queryKey: ["notifications", "badge"],
+    queryFn: () => apiClient.get("/notifications?unread=true").then((response) => response.data),
+    refetchInterval: 30000,
+  });
+  const { data: messageData } = useQuery({
+    queryKey: ["messages", "badge"],
+    queryFn: () => apiClient.get("/messages").then((response) => response.data),
+    refetchInterval: 10000,
+  });
+  const unreadNotifications = notificationData?.unreadCount ?? 0;
+  const unreadMessages = messageData?.unreadCount ?? 0;
+  const profile = settingsData?.settings?.profile;
+  const displayName = profile?.fullName || "User";
+  const displayRole = profile?.role?.replaceAll("_", " ") || "Member";
+  const initials = `${profile?.firstName?.[0] ?? "U"}${profile?.lastName?.[0] ?? ""}`;
 
   useEffect(() => {
-    setMounted(true);
     const handleShortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -149,9 +180,7 @@ export function Header({ className, onMobileToggle }: HeaderProps) {
           aria-label="Messages"
         >
           <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" />
-          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-            5
-          </span>
+          {unreadMessages > 0 && <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">{unreadMessages > 99 ? "99+" : unreadMessages}</span>}
         </Button>
 
         {/* Notifications */}
@@ -163,9 +192,7 @@ export function Header({ className, onMobileToggle }: HeaderProps) {
           aria-label="Notifications"
         >
           <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
-          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[9px] font-bold text-white">
-            12
-          </span>
+          {unreadNotifications > 0 && <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}
         </Button>
 
         {/* Settings */}
@@ -190,13 +217,13 @@ export function Header({ className, onMobileToggle }: HeaderProps) {
           aria-label="Open profile settings"
         >
           <div className="text-right hidden md:block">
-            <p className="text-xs sm:text-sm font-semibold text-foreground leading-none">Admin User</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Super Admin</p>
+            <p className="text-xs sm:text-sm font-semibold text-foreground leading-none">{displayName}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{displayRole}</p>
           </div>
           <Avatar className="h-8 w-8 sm:h-9 sm:w-9 ring-2 ring-primary/20 ring-offset-2 ring-offset-background">
-            <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=admin" />
+            <AvatarImage src={profile?.avatarUrl || undefined} />
             <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-              AU
+              {initials}
             </AvatarFallback>
           </Avatar>
         </button>

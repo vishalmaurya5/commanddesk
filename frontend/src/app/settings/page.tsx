@@ -1,228 +1,273 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Camera, Check, Save, Settings, Shield, User, Building } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { apiClient } from "@/lib/api-client";
-import {
-  Settings,
-  User,
-  Building,
-  Shield,
-  Bell,
-  CreditCard,
-  Globe,
-  Save,
-  Check,
-} from "lucide-react";
+
+type SettingsData = {
+  profile: {
+    firstName: string;
+    lastName: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    avatarUrl: string | null;
+    role: string;
+    timezone: string;
+  };
+  organization: {
+    companyName: string;
+    taxId: string;
+    email: string;
+    phone: string;
+    timezone: string;
+    country: string;
+  };
+  security: {
+    twoFactorEnabled: boolean;
+  };
+};
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<"profile" | "organization" | "notifications" | "security">("profile");
-  const [saved, setSaved] = useState(false);
-
-  const { data } = useQuery({
+  const { data, isLoading, error } = useQuery<{
+    settings: SettingsData;
+    canManageOrganization: boolean;
+  }>({
     queryKey: ["settings-data"],
-    queryFn: async () => {
-      const res = await apiClient.get("/settings");
-      return res.data;
-    },
+    queryFn: () => apiClient.get("/settings").then((response) => response.data),
   });
-
-  const settings = data?.settings || {
-    profile: {
-      fullName: "Alex Rivera",
-      email: "alex.rivera@commanddesk.io",
-      role: "Administrator",
-      timezone: "UTC-5 (Eastern Time)",
-    },
-    organization: {
-      companyName: "CommandDesk Enterprise",
-      workspaceUrl: "commanddesk.io/org/enterprise",
-      taxId: "US-894210952",
-      currency: "USD ($)",
-    },
-  };
-
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
 
   return (
     <DashboardLayout>
-      <div className="space-y-7 max-w-5xl mx-auto">
-        {/* Header Banner */}
+      <div className="mx-auto max-w-5xl space-y-7">
         <section className="relative overflow-hidden rounded-[28px] bg-midnight-navy px-6 py-7 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] sm:px-8">
           <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-primary-indigo/50 blur-3xl" />
-          <div className="absolute right-32 top-10 h-32 w-32 rounded-full bg-premium-teal/30 blur-3xl" />
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-slate-200 backdrop-blur">
-                <Settings className="h-3.5 w-3.5 text-teal-300" />
-                System Preferences
-              </div>
-              <h1 className="text-3xl font-bold tracking-tight text-white">
-                Workspace Settings
-              </h1>
+          <div className="relative">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-slate-200">
+              <Settings className="h-3.5 w-3.5 text-teal-300" />
+              System Preferences
             </div>
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-2 rounded-xl bg-teal px-4 py-2.5 font-medium text-white shadow-lg transition hover:opacity-90"
-            >
-              {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-              {saved ? "Saved Changes!" : "Save Changes"}
-            </button>
+            <h1 className="text-3xl font-bold tracking-tight">Workspace Settings</h1>
           </div>
         </section>
 
-        {/* Settings Navigation & Panel */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Navigation */}
-          <div className="col-span-1 rounded-2xl border border-border bg-card p-3 space-y-1">
-            <button
-              onClick={() => setActiveTab("profile")}
-              className={`flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${
-                activeTab === "profile"
-                  ? "bg-teal text-white"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              <User className="h-4 w-4" /> Profile Info
-            </button>
-            <button
-              onClick={() => setActiveTab("organization")}
-              className={`flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${
-                activeTab === "organization"
-                  ? "bg-teal text-white"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              <Building className="h-4 w-4" /> Organization Details
-            </button>
-            <button
-              onClick={() => setActiveTab("security")}
-              className={`flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${
-                activeTab === "security"
-                  ? "bg-teal text-white"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              <Shield className="h-4 w-4" /> Security & 2FA
-            </button>
-            <button
-              onClick={() => setActiveTab("notifications")}
-              className={`flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${
-                activeTab === "notifications"
-                  ? "bg-teal text-white"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              <Bell className="h-4 w-4" /> Notification Alerts
-            </button>
+        {isLoading && (
+          <div className="h-80 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+        )}
+        {error && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">
+            Settings could not be loaded. Refresh and try again.
           </div>
-
-          {/* Form Content */}
-          <div className="col-span-1 md:col-span-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
-            {activeTab === "profile" && (
-              <div className="space-y-4">
-                <h3 className="text-base font-semibold text-foreground">User Profile Settings</h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-muted-foreground">Full Name</label>
-                    <input
-                      type="text"
-                      defaultValue={settings.profile.fullName}
-                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-muted-foreground">Email Address</label>
-                    <input
-                      type="email"
-                      defaultValue={settings.profile.email}
-                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-muted-foreground">Role</label>
-                    <input
-                      type="text"
-                      disabled
-                      defaultValue={settings.profile.role}
-                      className="w-full rounded-xl border border-input bg-muted px-3 py-2 text-sm text-muted-foreground"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-muted-foreground">Timezone</label>
-                    <input
-                      type="text"
-                      defaultValue={settings.profile.timezone}
-                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "organization" && (
-              <div className="space-y-4">
-                <h3 className="text-base font-semibold text-foreground">Organization Configuration</h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-muted-foreground">Company Name</label>
-                    <input
-                      type="text"
-                      defaultValue={settings.organization.companyName}
-                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-muted-foreground">Tax Registration ID</label>
-                    <input
-                      type="text"
-                      defaultValue={settings.organization.taxId}
-                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "security" && (
-              <div className="space-y-4">
-                <h3 className="text-base font-semibold text-foreground">Security & Passwords</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between rounded-xl border border-border p-4">
-                    <div>
-                      <div className="font-semibold text-foreground text-sm">Two-Factor Authentication (2FA)</div>
-                      <div className="text-xs text-muted-foreground">Protect your account with SMS or authenticator app.</div>
-                    </div>
-                    <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-500">
-                      Enabled
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "notifications" && (
-              <div className="space-y-4">
-                <h3 className="text-base font-semibold text-foreground">Notification Preferences</h3>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3 text-sm text-foreground">
-                    <input type="checkbox" defaultChecked className="rounded border-input text-teal focus:ring-teal" />
-                    Receive daily email digests of pending leave approvals
-                  </label>
-                  <label className="flex items-center gap-3 text-sm text-foreground">
-                    <input type="checkbox" defaultChecked className="rounded border-input text-teal focus:ring-teal" />
-                    Desktop alerts for direct messages and team channels
-                  </label>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        )}
+        {data && (
+          <SettingsForm
+            key={`${data.settings.profile.email}-${data.settings.profile.avatarUrl ?? ""}`}
+            initial={data.settings}
+            canManageOrganization={data.canManageOrganization}
+          />
+        )}
       </div>
     </DashboardLayout>
+  );
+}
+
+function SettingsForm({
+  initial,
+  canManageOrganization,
+}: {
+  initial: SettingsData;
+  canManageOrganization: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"profile" | "organization" | "security">("profile");
+  const [message, setMessage] = useState("");
+  const [profile, setProfile] = useState({
+    firstName: initial.profile.firstName,
+    lastName: initial.profile.lastName,
+    phone: initial.profile.phone,
+  });
+  const [organization, setOrganization] = useState(initial.organization);
+
+  const save = useMutation({
+    mutationFn: () =>
+      activeTab === "organization"
+        ? apiClient.patch("/settings", { scope: "organization", ...organization })
+        : apiClient.patch("/settings", { scope: "profile", ...profile }),
+    onSuccess: async () => {
+      setMessage("Changes saved successfully.");
+      await queryClient.invalidateQueries({ queryKey: ["settings-data"] });
+      window.setTimeout(() => setMessage(""), 2500);
+    },
+  });
+
+  const uploadAvatar = useMutation({
+    mutationFn: async (file: File) => {
+      if (!["image/jpeg"].includes(file.type) || !/\.(jpe?g)$/i.test(file.name)) {
+        throw new Error("Only .jpg and .jpeg images are allowed.");
+      }
+      if (file.size > 100 * 1024) {
+        throw new Error("Profile image must be 100 KB or smaller.");
+      }
+      const payload = new FormData();
+      payload.append("avatar", file);
+      return apiClient.post("/profile/avatar", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    },
+    onSuccess: async () => {
+      setMessage("Profile picture updated.");
+      await queryClient.invalidateQueries({ queryKey: ["settings-data"] });
+    },
+  });
+
+  const tabs = [
+    { id: "profile" as const, label: "Profile Info", icon: User },
+    ...(canManageOrganization
+      ? [{ id: "organization" as const, label: "Organization", icon: Building }]
+      : []),
+    { id: "security" as const, label: "Security", icon: Shield },
+  ];
+
+  return (
+    <div className="grid gap-6 md:grid-cols-4">
+      <nav className="space-y-1 rounded-2xl border border-border bg-card p-3">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${
+              activeTab === tab.id
+                ? "bg-teal text-white"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            <tab.icon className="h-4 w-4" />
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm md:col-span-3">
+        {activeTab === "profile" && (
+          <div className="space-y-6">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="h-24 w-24 overflow-hidden rounded-2xl border border-border bg-muted">
+                {initial.profile.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={initial.profile.avatarUrl}
+                    alt={initial.profile.fullName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-2xl font-bold">
+                    {initial.profile.firstName[0]}{initial.profile.lastName[0]}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary-indigo px-4 py-2 text-sm font-semibold text-white">
+                  <Camera className="h-4 w-4" />
+                  Upload JPG
+                  <input
+                    type="file"
+                    accept=".jpg,.jpeg,image/jpeg"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) uploadAvatar.mutate(file);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  JPG or JPEG only. Maximum size 100 KB.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="First name" value={profile.firstName} onChange={(value) => setProfile({ ...profile, firstName: value })} />
+              <Field label="Last name" value={profile.lastName} onChange={(value) => setProfile({ ...profile, lastName: value })} />
+              <Field label="Phone" value={profile.phone} onChange={(value) => setProfile({ ...profile, phone: value })} />
+              <Field label="Email" value={initial.profile.email} disabled />
+              <Field label="Role" value={initial.profile.role.replaceAll("_", " ")} disabled />
+              <Field label="Timezone" value={initial.profile.timezone} disabled />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "organization" && canManageOrganization && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Company name" value={organization.companyName} onChange={(value) => setOrganization({ ...organization, companyName: value })} />
+            <Field label="Tax / GST ID" value={organization.taxId} onChange={(value) => setOrganization({ ...organization, taxId: value })} />
+            <Field label="Company email" value={organization.email} onChange={(value) => setOrganization({ ...organization, email: value })} />
+            <Field label="Company phone" value={organization.phone} onChange={(value) => setOrganization({ ...organization, phone: value })} />
+            <Field label="Timezone" value={organization.timezone} onChange={(value) => setOrganization({ ...organization, timezone: value })} />
+            <Field label="Country" value={organization.country} onChange={(value) => setOrganization({ ...organization, country: value })} />
+          </div>
+        )}
+
+        {activeTab === "security" && (
+          <div className="rounded-xl border border-border p-4">
+            <p className="font-semibold">Two-Factor Authentication</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Status: {initial.security.twoFactorEnabled ? "Enabled" : "Not enabled"}
+            </p>
+          </div>
+        )}
+
+        {(uploadAvatar.error || save.error) && (
+          <p className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+            {uploadAvatar.error?.message ?? "Unable to save these settings."}
+          </p>
+        )}
+        {message && (
+          <p className="mt-5 flex items-center gap-2 text-sm font-medium text-emerald-600">
+            <Check className="h-4 w-4" /> {message}
+          </p>
+        )}
+        {activeTab !== "security" && (
+          <div className="mt-6 flex justify-end">
+            <button
+              type="button"
+              onClick={() => save.mutate()}
+              disabled={save.isPending || uploadAvatar.isPending}
+              className="inline-flex items-center gap-2 rounded-xl bg-teal px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {save.isPending ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  value: string;
+  onChange?: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+      {label}
+      <input
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange?.(event.target.value)}
+        className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary disabled:bg-muted disabled:text-muted-foreground"
+      />
+    </label>
   );
 }

@@ -1,37 +1,70 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { TaskService } from "@/lib/services/task-service";
+import { authorize } from "@/lib/saas/authorize";
+import { apiError } from "@/lib/saas/api-error";
+import { PERMISSIONS } from "@/lib/saas/permissions";
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { companyId } = await authorize(PERMISSIONS.TASKS_VIEW);
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("projectId") || undefined;
     const tasks = await TaskService.getAll(
-      (session.user as any).companyId,
+      companyId,
       projectId
     );
     return NextResponse.json(tasks);
   } catch (error) {
-    console.error("Error fetching tasks:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError(error, "Unable to load tasks");
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { companyId } = await authorize(PERMISSIONS.TASKS_MANAGE);
+    const body = (await request.json()) as {
+      title?: string;
+      description?: string;
+      projectId?: string;
+      assigneeId?: string;
+      priority?: string;
+      dueDate?: string;
+    };
+    if (!body.title?.trim() || !body.projectId) {
+      return NextResponse.json(
+        { error: "Task title and project are required" },
+        { status: 400 },
+      );
     }
-    const body = await request.json();
-    const task = await TaskService.create(body);
+    const project = await prisma.project.findFirst({
+      where: { id: body.projectId, companyId },
+      select: { id: true },
+    });
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+    if (body.assigneeId) {
+      const assignee = await prisma.user.findFirst({
+        where: {
+          id: body.assigneeId,
+          companyId,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      if (!assignee) {
+        return NextResponse.json({ error: "Assignee not found" }, { status: 404 });
+      }
+    }
+    const task = await TaskService.create({
+      ...body,
+      title: body.title.trim(),
+      projectId: body.projectId,
+      dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+    });
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
-    console.error("Error creating task:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError(error, "Unable to create task");
   }
 }

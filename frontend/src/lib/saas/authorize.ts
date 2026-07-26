@@ -1,5 +1,6 @@
 import "server-only";
 
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -22,18 +23,36 @@ export async function getAccessContext() {
   if (!session) throw new AuthorizationError("Authentication required", 401);
   if (!session.user.companyId) throw new AuthorizationError("Select a workspace", 403);
 
-  const membership = await prisma.companyMembership.findUnique({
-    where: {
-      companyId_userId: {
-        companyId: session.user.companyId,
-        userId: session.user.id,
-      },
-    },
-    include: { customRole: true },
-  });
-
   const isSuperAdmin = session.user.role === "SUPER_ADMIN";
-  if (!membership && !isSuperAdmin) {
+  let membership: Prisma.CompanyMembershipGetPayload<{
+    include: { customRole: true };
+  }> | null = null;
+  let membershipSchemaUnavailable = false;
+
+  if (!isSuperAdmin) {
+    try {
+      membership = await prisma.companyMembership.findUnique({
+        where: {
+          companyId_userId: {
+            companyId: session.user.companyId,
+            userId: session.user.id,
+          },
+        },
+        include: { customRole: true },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2021"
+      ) {
+        membershipSchemaUnavailable = true;
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  if (!membership && !isSuperAdmin && !membershipSchemaUnavailable) {
     throw new AuthorizationError("Workspace membership required", 403);
   }
   if (membership && membership.status !== "ACTIVE") {

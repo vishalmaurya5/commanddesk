@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       data: {
         companyId,
         hostname,
-        verification: `commanddesk-verification=${randomBytes(20).toString("hex")}`,
+        verification: `solubrix-verification=${randomBytes(20).toString("hex")}`,
       },
     });
     return NextResponse.json({ domain }, { status: 201 });
