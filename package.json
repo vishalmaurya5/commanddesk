@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail --names frontend,backend --prefix-colors cyan,magenta \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
+    "dev": "npm run dev --prefix frontend",
+    "dev:full": "concurrently --kill-others-on-fail --names frontend,backend --prefix-colors cyan,magenta \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
     "dev:frontend": "npm run dev --prefix frontend",
-    "dev:backend": "npm run dev --prefix backend"
+    "dev:backend": "npm run dev --prefix backend",
+    "build": "npm run build --prefix frontend",
+    "start": "npm run start --prefix frontend"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

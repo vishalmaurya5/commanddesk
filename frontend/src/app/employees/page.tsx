@@ -1,0 +1,233 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import {
+  ArrowUpRight,
+  Building2,
+  Mail,
+  MoreHorizontal,
+  RefreshCw,
+  Search,
+  UserCheck,
+  UserPlus,
+  Users,
+} from "lucide-react";
+import { apiClient } from "@/lib/api-client";
+import { DashboardLayout } from "@/components/layout/dashboard-layout";
+
+type Employee = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  isActive?: boolean;
+  department?: { id: string; name: string } | null;
+  employeeProfile?: { designation?: string | null } | null;
+};
+
+export default function EmployeesPage() {
+  const [search, setSearch] = useState("");
+  const [department, setDepartment] = useState("ALL");
+
+  const {
+    data: employees = [],
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery<Employee[]>({
+    queryKey: ["employees"],
+    queryFn: () => apiClient.get("/employees").then((response) => response.data),
+  });
+
+  const departments = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          employees
+            .filter((employee) => employee.department)
+            .map((employee) => [employee.department!.id, employee.department!]),
+        ).values(),
+      ),
+    [employees],
+  );
+
+  const filteredEmployees = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return employees.filter((employee) => {
+      const matchesDepartment =
+        department === "ALL" || employee.department?.id === department;
+      const searchable = [
+        employee.firstName,
+        employee.lastName,
+        employee.email,
+        employee.role,
+        employee.department?.name,
+        employee.employeeProfile?.designation,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return matchesDepartment && (!term || searchable.includes(term));
+    });
+  }, [department, employees, search]);
+
+  const activeCount = employees.filter((employee) => employee.isActive !== false).length;
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-7">
+        <section className="relative overflow-hidden rounded-[28px] bg-midnight-navy px-6 py-7 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] sm:px-8">
+          <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-primary-indigo/50 blur-3xl" />
+          <div className="absolute right-32 top-10 h-32 w-32 rounded-full bg-premium-teal/30 blur-3xl" />
+          <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-slate-200 backdrop-blur">
+                <Users className="h-3.5 w-3.5 text-teal-300" />
+                People workspace
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Employee Directory
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                Find teammates, understand reporting structure, and manage every employee profile from one place.
+              </p>
+            </div>
+            <Link
+              href="/employees?create=1"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-midnight-navy shadow-lg transition hover:-translate-y-0.5 hover:bg-slate-100"
+            >
+              <UserPlus className="h-4 w-4 text-primary-indigo" />
+              Add employee
+            </Link>
+          </div>
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-3">
+          {[
+            { label: "Total employees", value: employees.length, icon: Users, color: "text-primary-indigo", bg: "bg-indigo-50 dark:bg-indigo-500/10" },
+            { label: "Active teammates", value: activeCount, icon: UserCheck, color: "text-premium-teal", bg: "bg-teal-50 dark:bg-teal-500/10" },
+            { label: "Departments", value: departments.length, icon: Building2, color: "text-sky-600", bg: "bg-sky-50 dark:bg-sky-500/10" },
+          ].map((stat) => (
+            <div key={stat.label} className="rounded-2xl border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/5 dark:bg-slate-900/80">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{stat.label}</p>
+                  <p className="mt-1 font-heading text-3xl font-bold text-midnight-navy dark:text-white">{stat.value}</p>
+                </div>
+                <div className={`rounded-2xl p-3 ${stat.bg}`}>
+                  <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        <section className="overflow-hidden rounded-[24px] border border-white/80 bg-white/90 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur dark:border-white/5 dark:bg-slate-900/90">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center dark:border-slate-800">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by name, email, role, or department"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-4 text-sm text-midnight-navy outline-none transition placeholder:text-slate-400 focus:border-primary-indigo focus:bg-white focus:ring-4 focus:ring-primary-indigo/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              />
+            </div>
+            <select
+              value={department}
+              onChange={(event) => setDepartment(event.target.value)}
+              className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 outline-none focus:border-primary-indigo focus:ring-4 focus:ring-primary-indigo/10 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              <option value="ALL">All departments</option>
+              {departments.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {isLoading ? (
+            <div className="grid gap-5 p-5 sm:grid-cols-2 xl:grid-cols-3">
+              {[1, 2, 3, 4, 5, 6].map((item) => (
+                <div key={item} className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="m-5 flex flex-col items-start gap-4 rounded-2xl border border-rose-200 bg-rose-50 p-6 sm:flex-row sm:items-center sm:justify-between dark:border-rose-900/50 dark:bg-rose-950/20">
+              <div>
+                <h2 className="font-heading text-lg font-semibold text-rose-950 dark:text-rose-100">Employee data is unavailable</h2>
+                <p className="mt-1 max-w-2xl text-sm text-rose-700 dark:text-rose-300">
+                  The directory could not reach its data service. Check the active database connection, then retry.
+                </p>
+              </div>
+              <button
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
+              >
+                <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+                Retry
+              </button>
+            </div>
+          ) : filteredEmployees.length === 0 ? (
+            <div className="flex flex-col items-center px-6 py-16 text-center">
+              <div className="mb-4 rounded-3xl bg-indigo-50 p-5 dark:bg-indigo-500/10">
+                <Users className="h-9 w-9 text-primary-indigo" />
+              </div>
+              <h2 className="font-heading text-xl font-semibold text-midnight-navy dark:text-white">No employees found</h2>
+              <p className="mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
+                {search || department !== "ALL" ? "Try changing your search or department filter." : "Add your first employee to begin building the company directory."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-5 p-5 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredEmployees.map((employee) => {
+                const initials = `${employee.firstName[0] ?? ""}${employee.lastName[0] ?? ""}`;
+                return (
+                  <article key={employee.id} className="group rounded-2xl border border-slate-200/80 bg-white p-5 transition duration-300 hover:-translate-y-1 hover:border-primary-indigo/25 hover:shadow-[0_18px_40px_rgba(67,56,202,0.10)] dark:border-slate-800 dark:bg-slate-950/60">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-indigo to-premium-teal text-sm font-bold text-white shadow-md shadow-indigo-500/20">
+                          {initials}
+                        </div>
+                        <div>
+                          <Link href={`/employees/${employee.id}`} className="font-heading text-base font-semibold text-midnight-navy transition hover:text-primary-indigo dark:text-white">
+                            {employee.firstName} {employee.lastName}
+                          </Link>
+                          <p className="mt-0.5 text-sm font-medium text-premium-teal">
+                            {employee.employeeProfile?.designation || employee.role}
+                          </p>
+                        </div>
+                      </div>
+                      <button className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-midnight-navy dark:hover:bg-slate-800 dark:hover:text-white" aria-label={`Actions for ${employee.firstName}`}>
+                        <MoreHorizontal className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <div className="mt-5 space-y-2.5 rounded-xl bg-slate-50 p-3.5 dark:bg-slate-900">
+                      <div className="flex items-center gap-2.5 text-sm text-slate-600 dark:text-slate-300">
+                        <Building2 className="h-4 w-4 text-slate-400" />
+                        <span>{employee.department?.name || "No department assigned"}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-sm text-slate-600 dark:text-slate-300">
+                        <Mail className="h-4 w-4 text-slate-400" />
+                        <span className="truncate">{employee.email}</span>
+                      </div>
+                    </div>
+
+                    <Link href={`/employees/${employee.id}`} className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-indigo transition group-hover:gap-2.5">
+                      View profile <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+    </DashboardLayout>
+  );
+}
