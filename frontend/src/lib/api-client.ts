@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-
 export const apiClient = axios.create({
-  baseURL: API_URL,
+  // The Next.js app owns the complete authenticated API surface. Keeping
+  // requests same-origin also preserves the Supabase SSR session cookies.
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },

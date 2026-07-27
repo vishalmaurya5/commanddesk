@@ -26,6 +26,14 @@ import { useRouter } from "next/navigation";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { createClient } from "@/utils/supabase/client";
+
+interface AuthIdentity {
+  name: string;
+  email: string;
+  avatarUrl: string;
+  role: string;
+}
 
 interface HeaderProps {
   className?: string;
@@ -40,6 +48,7 @@ export function Header({ className, onMobileToggle }: HeaderProps) {
     () => false,
   );
   const [search, setSearch] = useState("");
+  const [authIdentity, setAuthIdentity] = useState<AuthIdentity | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { data: settingsData } = useQuery({
@@ -59,9 +68,51 @@ export function Header({ className, onMobileToggle }: HeaderProps) {
   const unreadNotifications = notificationData?.unreadCount ?? 0;
   const unreadMessages = messageData?.unreadCount ?? 0;
   const profile = settingsData?.settings?.profile;
-  const displayName = profile?.fullName || "User";
-  const displayRole = profile?.role?.replaceAll("_", " ") || "Member";
-  const initials = `${profile?.firstName?.[0] ?? "U"}${profile?.lastName?.[0] ?? ""}`;
+  const displayName =
+    profile?.fullName ||
+    authIdentity?.name ||
+    authIdentity?.email?.split("@")[0] ||
+    "User";
+  const displayRole =
+    profile?.role?.replaceAll("_", " ") ||
+    authIdentity?.role?.replaceAll("_", " ") ||
+    "Member";
+  const initials =
+    profile?.firstName || profile?.lastName
+      ? `${profile?.firstName?.[0] ?? ""}${profile?.lastName?.[0] ?? ""}`
+      : displayName
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((part: string) => part[0])
+          .join("")
+          .toUpperCase() || "U";
+
+  useEffect(() => {
+    let active = true;
+    const supabase = createClient();
+
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!active || !data.user) return;
+
+      const userMetadata = data.user.user_metadata ?? {};
+      const appMetadata = data.user.app_metadata ?? {};
+      setAuthIdentity({
+        name:
+          userMetadata.full_name ||
+          userMetadata.name ||
+          [userMetadata.first_name, userMetadata.last_name].filter(Boolean).join(" "),
+        email: data.user.email ?? "",
+        avatarUrl: userMetadata.avatar_url || userMetadata.picture || "",
+        role: typeof appMetadata.commanddesk_role === "string"
+          ? appMetadata.commanddesk_role
+          : "",
+      });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -221,7 +272,7 @@ export function Header({ className, onMobileToggle }: HeaderProps) {
             <p className="text-[10px] text-muted-foreground mt-0.5">{displayRole}</p>
           </div>
           <Avatar className="h-8 w-8 sm:h-9 sm:w-9 ring-2 ring-primary/20 ring-offset-2 ring-offset-background">
-            <AvatarImage src={profile?.avatarUrl || undefined} />
+            <AvatarImage src={profile?.avatarUrl || authIdentity?.avatarUrl || undefined} />
             <AvatarFallback className="bg-primary text-primary-foreground text-xs">
               {initials}
             </AvatarFallback>
