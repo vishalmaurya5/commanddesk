@@ -6,7 +6,7 @@ import { seedWorkspaceDemoData } from "@/lib/saas/seed-workspace-demo-data";
 
 export async function POST() {
   try {
-    const { companyId, userId } = await authorize(PERMISSIONS.WORKSPACE_VIEW);
+    const { companyId, userId } = await authorize(PERMISSIONS.COMPANY_VIEW);
     const result = await seedWorkspaceDemoData(companyId, userId);
 
     if (!result.success && result.message) {

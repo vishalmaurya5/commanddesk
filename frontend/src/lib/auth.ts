@@ -120,8 +120,8 @@ export async function auth(): Promise<AppSession> {
       });
     });
 
-    if (profile.companyId) {
-      await seedWorkspaceDemoData(profile.companyId, profile.id);
+    if (profile.company?.id) {
+      await seedWorkspaceDemoData(profile.company.id, profile.id);
     }
   }
 

@@ -78,7 +78,7 @@ async function main() {
         name: "Acme Global Solutions",
         email: "contact@acmeglobal.com",
         companyName: "Acme Corp",
-        status: "ACTIVE",
+        isActive: true,
         companyId: company.id,
       },
     });
@@ -90,8 +90,7 @@ async function main() {
         status: "ACTIVE",
         budget: 50000,
         companyId: company.id,
-        clientId: client.id,
-        managerId: user.id,
+        leadId: user.id,
       },
     });
 
@@ -102,7 +101,6 @@ async function main() {
           status: "COMPLETED",
           priority: "HIGH",
           projectId: project.id,
-          companyId: company.id,
           assigneeId: user.id,
         },
         {
@@ -110,7 +108,6 @@ async function main() {
           status: "IN_PROGRESS",
           priority: "HIGH",
           projectId: project.id,
-          companyId: company.id,
           assigneeId: user.id,
         },
       ],
@@ -121,10 +118,10 @@ async function main() {
         {
           name: "John Miller",
           email: "jmiller@metacorp.com",
-          companyName: "MetaCorp Systems",
-          value: 35000,
+          budget: 35000,
           status: "PROPOSAL",
           companyId: company.id,
+          clientId: client.id,
         },
       ],
     });

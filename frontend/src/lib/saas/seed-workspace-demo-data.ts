@@ -18,7 +18,7 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
       },
     });
 
-    const hr = await prisma.department.create({
+    await prisma.department.create({
       data: {
         name: "Human Resources",
         code: "HR",
@@ -27,7 +27,7 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
       },
     });
 
-    const sales = await prisma.department.create({
+    await prisma.department.create({
       data: {
         name: "Sales & Marketing",
         code: "SALES",
@@ -36,7 +36,7 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
       },
     });
 
-    const finance = await prisma.department.create({
+    await prisma.department.create({
       data: {
         name: "Finance",
         code: "FIN",
@@ -59,7 +59,7 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
         phone: "+1 (555) 234-5678",
         companyName: "Acme Global Corp",
         address: "100 Innovation Way, San Francisco, CA",
-        status: "ACTIVE",
+        isActive: true,
         companyId,
       },
     });
@@ -71,7 +71,7 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
         phone: "+1 (555) 876-5432",
         companyName: "Apex Technologies Inc",
         address: "500 Tech Blvd, Austin, TX",
-        status: "ACTIVE",
+        isActive: true,
         companyId,
       },
     });
@@ -86,8 +86,7 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
         endDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
         budget: 45000,
         companyId,
-        clientId: client1.id,
-        managerId: ownerUserId,
+        leadId: ownerUserId,
       },
     });
 
@@ -100,8 +99,7 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
         endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
         budget: 28000,
         companyId,
-        clientId: client2.id,
-        managerId: ownerUserId,
+        leadId: ownerUserId,
       },
     });
 
@@ -114,7 +112,6 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
           status: "COMPLETED",
           priority: "HIGH",
           projectId: project1.id,
-          companyId,
           assigneeId: ownerUserId,
           dueDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
         },
@@ -124,7 +121,6 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
           status: "IN_PROGRESS",
           priority: "HIGH",
           projectId: project1.id,
-          companyId,
           assigneeId: ownerUserId,
           dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
         },
@@ -134,7 +130,6 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
           status: "IN_PROGRESS",
           priority: "CRITICAL",
           projectId: project1.id,
-          companyId,
           assigneeId: ownerUserId,
           dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         },
@@ -144,7 +139,6 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
           status: "TODO",
           priority: "MEDIUM",
           projectId: project2.id,
-          companyId,
           assigneeId: ownerUserId,
           dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
         },
@@ -158,30 +152,29 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
           name: "John Miller",
           email: "jmiller@metacorp.com",
           phone: "+1 (555) 345-6789",
-          companyName: "MetaCorp Systems",
-          value: 35000,
+          budget: 35000,
           status: "PROPOSAL",
           source: "Website",
           notes: "Interested in full HRMS + Finance command modules for 150 employees.",
           companyId,
+          clientId: client1.id,
         },
         {
           name: "Sarah Jenkins",
           email: "sjenkins@innovate.org",
           phone: "+1 (555) 987-6543",
-          companyName: "Innovate Foundation",
-          value: 18000,
+          budget: 18000,
           status: "QUALIFIED",
           source: "Referral",
           notes: "Looking for multi-tenant workspace management tool.",
           companyId,
+          clientId: client2.id,
         },
         {
           name: "David Chen",
           email: "dchen@nexuslogistics.com",
           phone: "+1 (555) 456-7890",
-          companyName: "Nexus Logistics",
-          value: 52000,
+          budget: 52000,
           status: "WON",
           source: "Direct Outreach",
           notes: "Closed annual contract for enterprise subscription tier.",
@@ -191,46 +184,25 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
     });
 
     // 6. Invoices & Expenses
-    const inv1 = await prisma.invoice.create({
+    await prisma.invoice.create({
       data: {
         invoiceNumber: "INV-2026-001",
         status: "PAID",
-        issueDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-        dueDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-        paidAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
-        subtotal: 5000,
+        amount: 5000,
         tax: 400,
         total: 5400,
+        dueDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+        paidAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
         notes: "Milestone 1 Payment for CommandDesk Setup",
         clientId: client1.id,
-        projectId: project1.id,
         companyId,
       },
-    });
-
-    await prisma.invoiceItem.createMany({
-      data: [
-        {
-          description: "Frontend Next.js Architecture Setup",
-          quantity: 1,
-          unitPrice: 3000,
-          total: 3000,
-          invoiceId: inv1.id,
-        },
-        {
-          description: "Prisma PostgreSQL Database Modeling",
-          quantity: 1,
-          unitPrice: 2000,
-          total: 2000,
-          invoiceId: inv1.id,
-        },
-      ],
     });
 
     await prisma.expense.createMany({
       data: [
         {
-          title: "Cloud Infrastructure Hosting (Supabase & Vercel)",
+          description: "Cloud Infrastructure Hosting (Supabase & Vercel)",
           category: "Infrastructure",
           amount: 350,
           date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
@@ -238,7 +210,7 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
           companyId,
         },
         {
-          title: "Developer Software Tools & AI Subscriptions",
+          description: "Developer Software Tools & AI Subscriptions",
           category: "Software",
           amount: 220,
           date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
@@ -253,17 +225,17 @@ export async function seedWorkspaceDemoData(companyId: string, ownerUserId: stri
       data: [
         {
           name: "Employee Handbook & Code of Conduct 2026",
+          fileUrl: "https://example.com/handbook.pdf",
           description: "Official workplace guidelines, code of conduct, and IT policies.",
           folder: "POLICY",
           uploaderId: ownerUserId,
-          companyId,
         },
         {
           name: "Remote Work & Hybrid Attendance Policy",
+          fileUrl: "https://example.com/remote-policy.pdf",
           description: "Standard operating procedures for remote & hybrid team members.",
           folder: "POLICY",
           uploaderId: ownerUserId,
-          companyId,
         },
       ],
     });
