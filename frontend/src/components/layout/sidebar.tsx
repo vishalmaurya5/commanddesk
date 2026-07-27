@@ -21,15 +21,18 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Loader2,
+  LogOut,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { PERMISSIONS, type Permission } from "@/lib/saas/permissions";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { createClient } from "@/utils/supabase/client";
 
 interface SidebarItem {
   label: string;
@@ -83,7 +86,10 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
   const [collapsed, setCollapsed] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["Employees"]);
   const [permissions, setPermissions] = useState<Set<string> | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
   const pathname = usePathname();
+  const router = useRouter();
   const { data: notificationData } = useQuery({
     queryKey: ["notifications", "badge"],
     queryFn: () => apiClient.get("/notifications?unread=true").then((response) => response.data),
@@ -155,6 +161,25 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
         ? prev.filter((l) => l !== label)
         : [...prev, label]
     );
+  };
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    setSignOutError("");
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      if (error) throw error;
+
+      localStorage.removeItem("token");
+      onMobileClose?.();
+      router.replace("/login");
+      router.refresh();
+    } catch (error) {
+      setSignOutError(error instanceof Error ? error.message : "Unable to sign out.");
+      setIsSigningOut(false);
+    }
   };
 
   return (
@@ -332,6 +357,31 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
                 )}
               </Link>
             ))}
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+              className={cn(
+                "sidebar-item w-full text-danger hover:bg-danger/10 hover:text-danger",
+                collapsed && "lg:justify-center lg:px-0"
+              )}
+              title={collapsed ? "Sign out" : undefined}
+              aria-label="Sign out"
+            >
+              <span className="flex-shrink-0">
+                {isSigningOut ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
+              </span>
+              {(!collapsed || mobileOpen) && (
+                <span className="flex-1 text-left">
+                  {isSigningOut ? "Signing out..." : "Sign out"}
+                </span>
+              )}
+            </button>
+            {signOutError && (!collapsed || mobileOpen) && (
+              <p className="px-3 pt-1 text-xs text-danger" role="alert">
+                {signOutError}
+              </p>
+            )}
           </nav>
         </div>
 
