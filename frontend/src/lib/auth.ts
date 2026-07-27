@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { Prisma } from "@prisma/client";
 import { createClient } from "@/utils/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { seedWorkspaceDemoData } from "@/lib/saas/seed-workspace-demo-data";
 
 export type AppSession = {
   user: {
@@ -118,6 +119,10 @@ export async function auth(): Promise<AppSession> {
         },
       });
     });
+
+    if (profile.companyId) {
+      await seedWorkspaceDemoData(profile.companyId, profile.id);
+    }
   }
 
   if (!profile.isActive) return null;
