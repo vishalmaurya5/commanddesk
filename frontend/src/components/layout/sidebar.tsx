@@ -104,6 +104,27 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
       .catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    onMobileClose?.();
+  }, [pathname, onMobileClose]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onMobileClose?.();
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [mobileOpen, onMobileClose]);
+
   const canView = (item: SidebarItem) =>
     permissions === null
       ? item.href === "/"
@@ -142,15 +163,19 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
       {mobileOpen && (
         <div
           onClick={onMobileClose}
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity"
+          className="fixed inset-0 z-40 bg-slate-950/35 lg:hidden transition-opacity"
+          aria-hidden="true"
         />
       )}
 
       <aside
+        aria-label="Main navigation"
+        aria-modal={mobileOpen ? "true" : undefined}
+        role={mobileOpen ? "dialog" : undefined}
         className={cn(
           "fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-border bg-card shadow-lg lg:shadow-none transition-all duration-300",
           collapsed ? "lg:w-[72px]" : "lg:w-[260px]",
-          "w-[260px]",
+          "w-[min(82vw,280px)]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
           className
         )}

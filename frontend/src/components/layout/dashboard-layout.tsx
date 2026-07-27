@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { cn } from "@/lib/utils";
@@ -13,12 +13,13 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, className }: DashboardLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const closeMobileMenu = useCallback(() => setMobileOpen(false), []);
 
   return (
     <div className="relative min-h-screen bg-background text-foreground transition-colors duration-300">
       <Sidebar
         mobileOpen={mobileOpen}
-        onMobileClose={() => setMobileOpen(false)}
+        onMobileClose={closeMobileMenu}
       />
 
       <div className="lg:pl-[260px] flex flex-col min-h-screen transition-all duration-300">
