@@ -56,17 +56,10 @@ export default function EmployeesPage() {
     queryFn: () => apiClient.get("/employees").then((response) => response.data),
   });
 
-  const departments = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          employees
-            .filter((employee) => employee.department)
-            .map((employee) => [employee.department!.id, employee.department!]),
-        ).values(),
-      ),
-    [employees],
-  );
+  const { data: departments = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["departments"],
+    queryFn: () => apiClient.get("/departments").then((res) => res.data),
+  });
 
   const filteredEmployees = useMemo(() => {
     const term = search.trim().toLowerCase();

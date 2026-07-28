@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const { userId, session } = await authorize(PERMISSIONS.DOCUMENTS_MANAGE);
     const form = await request.formData();
     const file = form.get("file");
-    if (!(file instanceof File) || file.size === 0) return NextResponse.json({ error: "Select a file" }, { status: 400 });
+    if (!file || typeof file === "string" || !file.size) return NextResponse.json({ error: "Select a file" }, { status: 400 });
     if (file.size > MAX_BYTES) return NextResponse.json({ error: "File must be 10 MB or smaller" }, { status: 400 });
     if (!ALLOWED.has(file.type)) return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
     const extension = file.name.includes(".") ? file.name.split(".").pop()!.replace(/[^a-zA-Z0-9]/g, "") : "bin";

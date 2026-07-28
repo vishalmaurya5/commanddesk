@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get("avatar");
 
-    if (!(file instanceof File) || file.size === 0) {
+    if (!file || typeof file === "string" || !file.size) {
       return NextResponse.json({ error: "Select an image file" }, { status: 400 });
     }
 
