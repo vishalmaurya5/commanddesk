@@ -104,11 +104,12 @@ function SettingsForm({
 
   const uploadAvatar = useMutation({
     mutationFn: async (file: File) => {
-      if (!["image/jpeg"].includes(file.type) || !/\.(jpe?g)$/i.test(file.name)) {
-        throw new Error("Only .jpg and .jpeg images are allowed.");
+      const allowed = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+      if (!allowed.has(file.type)) {
+        throw new Error("Only JPG, PNG, WEBP, and GIF images are allowed.");
       }
-      if (file.size > 100 * 1024) {
-        throw new Error("Profile image must be 100 KB or smaller.");
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error("Profile image must be 5 MB or smaller.");
       }
       const payload = new FormData();
       payload.append("avatar", file);

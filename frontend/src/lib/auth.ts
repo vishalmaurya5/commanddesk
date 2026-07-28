@@ -177,7 +177,52 @@ export async function auth(): Promise<AppSession> {
   const activeMembership =
     memberships.find((item) => item.companyId === requestedCompanyId) ??
     memberships[0];
-  const company = activeMembership?.company ?? profile.company;
+  let company = activeMembership?.company ?? profile.company;
+
+  if (!company) {
+    let defaultCompany = await prisma.company.findFirst({
+      select: { id: true, name: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (!defaultCompany) {
+      defaultCompany = await prisma.company.create({
+        data: {
+          name: "CommandDesk Workspace",
+          slug: `workspace-${profile.id.slice(0, 8)}`,
+          email: profile.email,
+        },
+        select: { id: true, name: true },
+      });
+      await seedWorkspaceDemoData(defaultCompany.id, profile.id);
+    }
+
+    await prisma.user.update({
+      where: { id: profile.id },
+      data: { companyId: defaultCompany.id },
+    }).catch(() => null);
+
+    await prisma.companyMembership.upsert({
+      where: {
+        companyId_userId: {
+          companyId: defaultCompany.id,
+          userId: profile.id,
+        },
+      },
+      create: {
+        companyId: defaultCompany.id,
+        userId: profile.id,
+        role: profile.role || "ORGANIZATION_OWNER",
+        status: "ACTIVE",
+        isDefault: true,
+      },
+      update: {
+        status: "ACTIVE",
+      },
+    }).catch(() => null);
+
+    company = defaultCompany;
+  }
 
   return {
     user: {
@@ -187,8 +232,8 @@ export async function auth(): Promise<AppSession> {
       name: `${profile.firstName} ${profile.lastName}`.trim(),
       image: profile.avatarUrl,
       role: activeMembership?.role ?? profile.role,
-      companyId: company?.id ?? null,
-      companyName: company?.name ?? null,
+      companyId: company.id,
+      companyName: company.name,
     },
   };
 }

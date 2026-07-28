@@ -6,7 +6,8 @@ import { apiError } from "@/lib/saas/api-error";
 import { PERMISSIONS } from "@/lib/saas/permissions";
 import { createClient } from "@/utils/supabase/server";
 
-const MAX_AVATAR_BYTES = 100 * 1024;
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+const ALLOWED_AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export async function POST(request: Request) {
   try {
@@ -15,21 +16,18 @@ export async function POST(request: Request) {
     const file = formData.get("avatar");
 
     if (!(file instanceof File) || file.size === 0) {
-      return NextResponse.json({ error: "Select a JPG image" }, { status: 400 });
+      return NextResponse.json({ error: "Select an image file" }, { status: 400 });
     }
 
-    const fileName = file.name.toLowerCase();
-    const hasAllowedExtension =
-      fileName.endsWith(".jpg") || fileName.endsWith(".jpeg");
-    if (!hasAllowedExtension || file.type !== "image/jpeg") {
+    if (!ALLOWED_AVATAR_TYPES.has(file.type)) {
       return NextResponse.json(
-        { error: "Only .jpg and .jpeg images are allowed" },
+        { error: "Only JPG, PNG, WEBP, and GIF images are allowed" },
         { status: 400 },
       );
     }
     if (file.size > MAX_AVATAR_BYTES) {
       return NextResponse.json(
-        { error: "Profile image must be 100 KB or smaller" },
+        { error: "Profile image must be 5 MB or smaller" },
         { status: 400 },
       );
     }

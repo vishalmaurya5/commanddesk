@@ -16,6 +16,13 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const getAppOrigin = () => {
+    if (typeof window !== "undefined" && window.location.origin && window.location.origin !== "null") {
+      return window.location.origin;
+    }
+    return process.env.NEXT_PUBLIC_APP_URL || "https://commanddesk-gold.vercel.app";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -26,7 +33,7 @@ export default function LoginPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: `${getAppOrigin()}/auth/callback`,
           },
         });
         if (signUpError) throw signUpError;
@@ -52,7 +59,7 @@ export default function LoginPage() {
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${getAppOrigin()}/auth/callback`,
       },
     });
     if (oauthError) {
@@ -67,14 +74,13 @@ export default function LoginPage() {
       return;
     }
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
+      redirectTo: `${getAppOrigin()}/auth/callback?next=/settings`,
     });
     setError(resetError?.message ?? "Password reset email sent.");
   };
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Hero Section */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary/90 to-teal relative overflow-hidden">
         <div className="absolute inset-0 bg-grid-white/5" />
         <div className="relative z-10 flex flex-col justify-center items-center w-full p-12">

@@ -272,8 +272,8 @@ export function Header({ className, onMobileToggle }: HeaderProps) {
             <p className="text-[10px] text-muted-foreground mt-0.5">{displayRole}</p>
           </div>
           <Avatar className="h-8 w-8 sm:h-9 sm:w-9 ring-2 ring-primary/20 ring-offset-2 ring-offset-background">
-            <AvatarImage src={profile?.avatarUrl || authIdentity?.avatarUrl || undefined} />
-            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+            <AvatarImage src={profile?.avatarUrl || authIdentity?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"} />
+            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
               {initials}
             </AvatarFallback>
           </Avatar>

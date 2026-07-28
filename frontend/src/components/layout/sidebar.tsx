@@ -156,7 +156,7 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
 
   const canView = (item: SidebarItem) =>
     permissions === null
-      ? item.href === "/"
+      ? true
       : !item.permission || permissions.has(item.permission);
 
   const visibleSidebarItems = sidebarItems
