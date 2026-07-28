@@ -49,6 +49,7 @@ export class ProjectService {
   }
 
   static async update(id: string, data: any) {
+    if (data.leadId === "") data.leadId = null;
     return prisma.project.update({ where: { id }, data });
   }
 

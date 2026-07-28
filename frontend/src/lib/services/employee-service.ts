@@ -84,7 +84,7 @@ export class EmployeeService {
       where: { id },
       data: {
         ...userData,
-        departmentId,
+        departmentId: departmentId === "" ? null : departmentId,
         employeeProfile: designation
           ? { update: { designation } }
           : undefined,

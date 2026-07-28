@@ -44,6 +44,7 @@ export class DepartmentService {
   }
 
   static async update(id: string, data: Prisma.DepartmentUpdateInput) {
+    if (data.headId === "") data.headId = null;
     return prisma.department.update({
       where: { id },
       data,

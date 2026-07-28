@@ -55,6 +55,10 @@ export class TaskService {
       where: { id },
       data: {
         ...data,
+        assigneeId: data.assigneeId === "" ? null : data.assigneeId,
+        projectId: data.projectId === "" ? null : data.projectId,
+        milestoneId: data.milestoneId === "" ? null : data.milestoneId,
+        parentTaskId: data.parentTaskId === "" ? null : data.parentTaskId,
         completedAt: data.status === "COMPLETED" ? new Date() : undefined,
       },
       include: { assignee: { select: { id: true, firstName: true, lastName: true } } },
