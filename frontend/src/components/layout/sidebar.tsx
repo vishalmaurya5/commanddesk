@@ -349,25 +349,6 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
 
         {/* Bottom Utility Items */}
         <div className="border-t border-border px-3 py-3">
-          {accessError && (!collapsed || mobileOpen) && (
-            <div className="mb-2 rounded-xl border border-danger/20 bg-danger/10 p-3 text-xs" role="alert">
-              <div className="flex items-start gap-2 text-danger">
-                <CircleAlert size={16} className="mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-semibold">Workspace unavailable</p>
-                  <p className="mt-1 text-muted-foreground">{accessError}</p>
-                  <button
-                    type="button"
-                    onClick={() => void loadAccess()}
-                    disabled={isLoadingAccess}
-                    className="mt-2 font-semibold text-danger underline underline-offset-2 disabled:opacity-60"
-                  >
-                    {isLoadingAccess ? "Retrying..." : "Retry"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
           <nav className="space-y-1">
             {visibleBottomItems.map((item) => (
               <Link
