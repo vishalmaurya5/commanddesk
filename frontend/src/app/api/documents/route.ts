@@ -28,11 +28,30 @@ export async function POST(request: Request) {
     if (!ALLOWED.has(file.type)) return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
     const extension = file.name.includes(".") ? file.name.split(".").pop()!.replace(/[^a-zA-Z0-9]/g, "") : "bin";
     const path = `${session.user.authUserId}/${Date.now()}-${randomUUID()}.${extension}`;
-    const supabase = await createClient();
-    const upload = await supabase.storage.from("documents").upload(path, await file.arrayBuffer(), { contentType: file.type, upsert: false });
-    if (upload.error) throw upload.error;
-    const { data } = supabase.storage.from("documents").getPublicUrl(path);
-    const document = await prisma.document.create({ data: { name: String(form.get("name") || file.name).trim(), description: String(form.get("description") || "") || null, folder: String(form.get("folder") || "General"), isPublic: form.get("isPublic") === "true", fileUrl: data.publicUrl, fileType: file.type, fileSize: file.size, uploaderId: userId } });
+    let finalFileUrl: string;
+    try {
+      const supabase = await createClient();
+      const upload = await supabase.storage.from("documents").upload(path, await file.arrayBuffer(), { contentType: file.type, upsert: false });
+      if (upload.error) throw upload.error;
+      const { data } = supabase.storage.from("documents").getPublicUrl(path);
+      finalFileUrl = data.publicUrl;
+    } catch {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      finalFileUrl = `data:${file.type};base64,${buffer.toString("base64")}`;
+    }
+
+    const document = await prisma.document.create({
+      data: {
+        name: String(form.get("name") || file.name).trim(),
+        description: String(form.get("description") || "") || null,
+        folder: String(form.get("folder") || "General"),
+        isPublic: form.get("isPublic") === "true",
+        fileUrl: finalFileUrl,
+        fileType: file.type,
+        fileSize: file.size,
+        uploaderId: userId,
+      },
+    });
     return NextResponse.json(document, { status: 201 });
   } catch (error) { return apiError(error, "Unable to upload document"); }
 }

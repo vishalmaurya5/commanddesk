@@ -34,26 +34,32 @@ export async function POST(request: Request) {
       );
     }
 
-    const objectPath =
-      `${session.user.authUserId}/${Date.now()}-${randomUUID()}.jpg`;
-    const supabase = await createClient();
-    const upload = await supabase.storage
-      .from("avatars")
-      .upload(objectPath, await file.arrayBuffer(), {
-        contentType: "image/jpeg",
-        cacheControl: "3600",
-        upsert: false,
-      });
+    const objectPath = `${session.user.authUserId}/${Date.now()}-${randomUUID()}.jpg`;
+    let avatarUrl: string;
+    try {
+      const supabase = await createClient();
+      const upload = await supabase.storage
+        .from("avatars")
+        .upload(objectPath, await file.arrayBuffer(), {
+          contentType: "image/jpeg",
+          cacheControl: "3600",
+          upsert: false,
+        });
 
-    if (upload.error) throw upload.error;
+      if (upload.error) throw upload.error;
+      const { data } = supabase.storage.from("avatars").getPublicUrl(objectPath);
+      avatarUrl = data.publicUrl;
+    } catch {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      avatarUrl = `data:image/jpeg;base64,${buffer.toString("base64")}`;
+    }
 
-    const { data } = supabase.storage.from("avatars").getPublicUrl(objectPath);
     await prisma.user.update({
       where: { id: userId },
-      data: { avatarUrl: data.publicUrl },
+      data: { avatarUrl },
     });
 
-    return NextResponse.json({ avatarUrl: data.publicUrl });
+    return NextResponse.json({ avatarUrl });
   } catch (error) {
     return apiError(error, "Unable to upload profile image");
   }
