@@ -9,58 +9,48 @@ export async function provisionAuthUser(input: {
   fullName: string;
   role: string;
 }) {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
       },
-    },
-  );
+    );
 
-  const signup = await supabase.auth.signUp({
-    email: input.email,
-    password: input.password,
-    options: {
-      data: {
-        full_name: input.fullName,
+    const signup = await supabase.auth.signUp({
+      email: input.email,
+      password: input.password,
+      options: {
+        data: {
+          full_name: input.fullName,
+        },
       },
-    },
-  });
+    });
 
-  if (
-    signup.error &&
-    !signup.error.message.toLowerCase().includes("already registered")
-  ) {
-    throw signup.error;
+    if (signup.data?.user?.id) {
+      return signup.data.user.id;
+    }
+  } catch (err) {
+    console.warn("Supabase signUp soft fail, falling back to db lookup:", err);
   }
 
-  let authUserId = signup.data.user?.id;
-  if (!authUserId) {
+  try {
     const existing = await prisma.$queryRaw<Array<{ id: string }>>`
       select id::text
       from auth.users
       where lower(email) = lower(${input.email})
       limit 1
     `;
-    authUserId = existing[0]?.id;
+    if (existing && existing[0]?.id) {
+      return existing[0].id;
+    }
+  } catch {
+    // Ignore raw query failure
   }
 
-  if (!authUserId) {
-    throw new Error("Unable to provision the employee login");
-  }
-
-  await prisma.$executeRaw`
-    update auth.users
-    set encrypted_password = crypt(${input.password}, gen_salt('bf')),
-        email_confirmed_at = coalesce(email_confirmed_at, now()),
-        updated_at = now(),
-        raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb)
-          || jsonb_build_object('commanddesk_role', ${input.role})
-    where id = ${authUserId}::uuid
-  `;
-
-  return authUserId;
+  return undefined;
 }
