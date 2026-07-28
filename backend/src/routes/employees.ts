@@ -7,7 +7,7 @@ const router: Router = express.Router();
 router.get("/", async (req: Request, res: Response) => {
   try {
     const employees = await prisma.user.findMany({
-      where: { role: { in: ["EMPLOYEE", "MANAGER", "TEAM_LEAD", "HR"] } },
+      where: { isActive: true },
       include: { employeeProfile: true, department: true, company: true },
     });
     res.json(employees);
