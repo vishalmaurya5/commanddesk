@@ -28,7 +28,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Select an image file" }, { status: 400 });
     }
 
-    if (!ALLOWED_AVATAR_TYPES.has(file.type)) {
+    const isAllowedType =
+      ALLOWED_AVATAR_TYPES.has(file.type) ||
+      /\.(jpe?g|png|webp|gif)$/i.test(file.name);
+
+    if (!isAllowedType) {
       return NextResponse.json(
         { error: "Only JPG, PNG, WEBP, and GIF images are allowed" },
         { status: 400 },

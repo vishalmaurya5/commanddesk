@@ -113,9 +113,7 @@ function SettingsForm({
       }
       const payload = new FormData();
       payload.append("avatar", file);
-      return apiClient.post("/profile/avatar", payload, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      return apiClient.post("/profile/avatar", payload);
     },
     onSuccess: async () => {
       setMessage("Profile picture updated.");
