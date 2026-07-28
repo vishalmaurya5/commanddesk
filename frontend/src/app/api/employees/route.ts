@@ -204,14 +204,17 @@ export async function POST(request: Request) {
       role,
       companyId: companyId,
       authUserId,
-      departmentId: body.departmentId,
+      departmentId: body.departmentId || undefined,
       designation: body.designation?.trim() || "Team Member",
       phone: body.phone?.trim(),
     });
 
     return NextResponse.json(employee, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("POST /api/employees error:", error);
-    return apiError(error, "Unable to create employee");
+    return NextResponse.json(
+      { error: "Unable to create employee", details: error?.message || String(error) },
+      { status: 500 }
+    );
   }
 }

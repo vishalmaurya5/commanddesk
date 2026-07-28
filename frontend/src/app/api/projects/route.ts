@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       description: body.description?.trim(),
       startDate: body.startDate ? new Date(body.startDate) : undefined,
       endDate: body.endDate ? new Date(body.endDate) : undefined,
-      leadId: body.leadId,
+      leadId: body.leadId || undefined,
       companyId,
     });
     return NextResponse.json(project, { status: 201 });

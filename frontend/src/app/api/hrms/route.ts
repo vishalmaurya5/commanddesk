@@ -85,7 +85,7 @@ export async function PATCH(request: Request) {
         const employee = await prisma.user.findFirst({ where: { id: body.data.userId, companyId, isActive: true }, select: { id: true } });
         if (!employee) return NextResponse.json({ error: "Employee not found" }, { status: 404 });
       }
-      return NextResponse.json(await prisma.asset.update({ where: { id: body.id }, data: { name: body.data?.name?.trim(), type: body.data?.type?.trim(), serialNumber: body.data?.serialNumber || null, model: body.data?.model || null, brand: body.data?.brand || null, value: body.data?.value === "" ? null : body.data?.value === undefined ? undefined : Number(body.data.value), status: body.data?.status, userId: body.data?.userId } }));
+      return NextResponse.json(await prisma.asset.update({ where: { id: body.id }, data: { name: body.data?.name?.trim(), type: body.data?.type?.trim(), serialNumber: body.data?.serialNumber || null, model: body.data?.model || null, brand: body.data?.brand || null, value: body.data?.value === "" ? null : body.data?.value === undefined ? undefined : Number(body.data.value), status: body.data?.status, userId: body.data?.userId || undefined } }));
     }
     const folder = body.type === "policy" ? "POLICY" : body.type === "training" ? "TRAINING" : undefined;
     const owned = await prisma.document.findFirst({ where: { id: body.id, uploader: { companyId }, ...(folder ? { folder } : {}) }, select: { id: true } });

@@ -60,7 +60,8 @@ export async function POST(request: Request) {
     const task = await TaskService.create({
       ...body,
       title: body.title.trim(),
-      projectId: body.projectId,
+      projectId: body.projectId || undefined,
+      assigneeId: body.assigneeId || undefined,
       dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
     });
     return NextResponse.json(task, { status: 201 });
