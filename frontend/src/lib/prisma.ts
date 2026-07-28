@@ -8,7 +8,14 @@ const globalForPrisma = globalThis as unknown as {
 
 const connectionString = process.env.DATABASE_URL;
 
-const pool = new Pool({ connectionString });
+// Parse the connection string to handle SSL correctly for Supabase/Vercel
+const isLocal = !connectionString || connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+
+const pool = new Pool({ 
+  connectionString,
+  // Supabase requires SSL for remote connections. 
+  ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } })
+});
 const adapter = new PrismaPg(pool);
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({

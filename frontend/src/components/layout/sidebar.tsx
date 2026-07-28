@@ -105,7 +105,6 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
   });
 
   const loadAccess = useCallback(async () => {
-    setIsLoadingAccess(true);
     setAccessError("");
 
     try {
