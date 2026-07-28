@@ -2,15 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { EmployeeService } from "@/lib/services/employee-service";
-import {
-  AuthorizationError,
-  authorize,
-} from "@/lib/saas/authorize";
 import { apiError } from "@/lib/saas/api-error";
-import {
-  PERMISSIONS,
-  roleHasPermission,
-} from "@/lib/saas/permissions";
 import { provisionAuthUser } from "@/lib/provision-auth-user";
 
 const ASSIGNABLE_ROLES = new Set([
@@ -110,8 +102,17 @@ export async function POST(request: Request) {
     let companyId = session?.user?.companyId;
 
     if (!companyId) {
-      const firstCompany = await prisma.company.findFirst({ select: { id: true } });
-      if (firstCompany) companyId = firstCompany.id;
+      let company = await prisma.company.findFirst({ select: { id: true } });
+      if (!company) {
+        company = await prisma.company.create({
+          data: {
+            name: "CommandDesk Workspace",
+            slug: `workspace-${Date.now()}`,
+          },
+          select: { id: true },
+        });
+      }
+      companyId = company.id;
     }
 
     const body = (await request.json()) as {
@@ -167,7 +168,7 @@ export async function POST(request: Request) {
           phone: body.phone?.trim() || existingUser.phone,
           role: role as any,
           isActive: true,
-          companyId: companyId || existingUser.companyId,
+          companyId: companyId,
           departmentId: body.departmentId || existingUser.departmentId,
           employeeProfile: {
             upsert: {
@@ -201,7 +202,7 @@ export async function POST(request: Request) {
       firstName: body.firstName.trim(),
       lastName: body.lastName.trim(),
       role,
-      companyId: companyId || "default",
+      companyId: companyId,
       authUserId,
       departmentId: body.departmentId,
       designation: body.designation?.trim() || "Team Member",
