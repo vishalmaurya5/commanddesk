@@ -49,13 +49,22 @@ export async function POST(request: Request) {
       avatarUrl = data.publicUrl;
     } catch {
       const buffer = Buffer.from(await file.arrayBuffer());
-      avatarUrl = `data:image/jpeg;base64,${buffer.toString("base64")}`;
+      avatarUrl = `data:${file.type};base64,${buffer.toString("base64")}`;
     }
 
     await prisma.user.update({
       where: { id: userId },
       data: { avatarUrl },
     });
+
+    try {
+      const supabase = await createClient();
+      await supabase.auth.updateUser({
+        data: { avatar_url: avatarUrl },
+      });
+    } catch {
+      // Ignore auth metadata sync error
+    }
 
     return NextResponse.json({ avatarUrl });
   } catch (error) {
