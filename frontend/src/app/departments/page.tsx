@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Building2, Plus, Users, MoreVertical, X } from 'lucide-react';
+import { Building2, Plus, Users, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -24,13 +24,17 @@ type Employee = {
 
 export default function DepartmentsPage() {
   const queryClient = useQueryClient();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [form, setForm] = useState({
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
+  const [deletingDepartmentId, setDeletingDepartmentId] = useState<string | null>(null);
+
+  const initialFormState = {
     name: '',
     code: '',
     description: '',
     headId: '',
-  });
+  };
+  const [form, setForm] = useState(initialFormState);
 
   const { data: departments = [], isLoading, error } = useQuery<Department[]>({
     queryKey: ['departments'],
@@ -40,8 +44,25 @@ export default function DepartmentsPage() {
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ['employees', 'department-heads'],
     queryFn: () => apiClient.get('/employees').then((res) => res.data),
-    enabled: isCreateOpen,
+    enabled: isFormOpen,
   });
+
+  const handleEditClick = (dept: Department) => {
+    setEditingDepartment(dept);
+    setForm({
+      name: dept.name,
+      code: dept.code || '',
+      description: dept.description || '',
+      headId: dept.head?.id || '',
+    });
+    setIsFormOpen(true);
+  };
+
+  const handleCloseForm = () => {
+    setIsFormOpen(false);
+    setEditingDepartment(null);
+    setForm(initialFormState);
+  };
 
   const createDepartment = useMutation({
     mutationFn: () =>
@@ -53,14 +74,35 @@ export default function DepartmentsPage() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['departments'] });
-      setForm({ name: '', code: '', description: '', headId: '' });
-      setIsCreateOpen(false);
+      handleCloseForm();
+    },
+  });
+
+  const updateDepartment = useMutation({
+    mutationFn: () =>
+      apiClient.patch(`/departments/${editingDepartment?.id}`, {
+        name: form.name,
+        code: form.code || undefined,
+        description: form.description || undefined,
+        headId: form.headId || undefined,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['departments'] });
+      handleCloseForm();
+    },
+  });
+
+  const deleteDepartment = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/departments/${id}`),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['departments'] });
+      setDeletingDepartmentId(null);
     },
   });
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 relative">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -73,7 +115,11 @@ export default function DepartmentsPage() {
           </div>
           <button
             type="button"
-            onClick={() => setIsCreateOpen((open) => !open)}
+            onClick={() => {
+              setEditingDepartment(null);
+              setForm(initialFormState);
+              setIsFormOpen((open) => !open);
+            }}
             className="flex items-center gap-2 rounded-xl bg-primary-indigo px-4 py-2 text-sm font-medium text-white transition-all hover:bg-primary-indigo/90 hover:shadow-md"
           >
             <Plus className="h-4 w-4" />
@@ -81,26 +127,30 @@ export default function DepartmentsPage() {
           </button>
         </div>
 
-        {isCreateOpen && (
+        {isFormOpen && (
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              createDepartment.mutate();
+              if (editingDepartment) {
+                updateDepartment.mutate();
+              } else {
+                createDepartment.mutate();
+              }
             }}
             className="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm dark:border-indigo-500/20 dark:bg-midnight-navy"
           >
             <div className="mb-5 flex items-start justify-between">
               <div>
                 <h2 className="font-heading text-xl font-semibold text-midnight-navy dark:text-white">
-                  Add Department
+                  {editingDepartment ? 'Edit Department' : 'Add Department'}
                 </h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  Create an organizational unit and optionally assign its head.
+                  {editingDepartment ? 'Update the details for this department.' : 'Create an organizational unit and optionally assign its head.'}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={handleCloseForm}
                 className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 aria-label="Close department form"
               >
@@ -153,25 +203,25 @@ export default function DepartmentsPage() {
                 />
               </label>
             </div>
-            {createDepartment.error && (
+            {(createDepartment.error || updateDepartment.error) && (
               <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">
-                Unable to create the department. Check the details and try again.
+                {createDepartment.error ? 'Unable to create the department. Check the details and try again.' : 'Unable to update the department.'}
               </p>
             )}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={handleCloseForm}
                 className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={createDepartment.isPending}
+                disabled={createDepartment.isPending || updateDepartment.isPending}
                 className="rounded-xl bg-primary-indigo px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
-                {createDepartment.isPending ? 'Creating…' : 'Create Department'}
+                {createDepartment.isPending || updateDepartment.isPending ? 'Saving…' : (editingDepartment ? 'Update Department' : 'Create Department')}
               </button>
             </div>
           </form>
@@ -213,9 +263,22 @@ export default function DepartmentsPage() {
                       </p>
                     </div>
                   </div>
-                  <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                    <MoreVertical className="h-5 w-5" />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 transition-opacity group-hover:opacity-100">
+                    <button 
+                      onClick={() => handleEditClick(dept)}
+                      className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-primary-indigo dark:hover:bg-gray-800 dark:hover:text-primary-indigo"
+                      aria-label="Edit Department"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                    <button 
+                      onClick={() => setDeletingDepartmentId(dept.id)}
+                      className="rounded-lg p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                      aria-label="Delete Department"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-6 flex flex-col gap-4">
@@ -248,6 +311,38 @@ export default function DepartmentsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deletingDepartmentId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-midnight-navy border border-gray-100 dark:border-gray-800">
+            <div className="flex items-center gap-4 text-red-600 dark:text-red-500 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/20">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-semibold text-midnight-navy dark:text-white">Delete Department</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+              Are you sure you want to delete this department? Employees assigned to this department might lose their association.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeletingDepartmentId(null)}
+                className="rounded-xl px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteDepartment.mutate(deletingDepartmentId)}
+                disabled={deleteDepartment.isPending}
+                className="rounded-xl bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteDepartment.isPending ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

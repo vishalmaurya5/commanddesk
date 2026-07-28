@@ -1,19 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   ArrowUpRight,
   Building2,
   Mail,
-  MoreHorizontal,
+  Edit2,
+  Trash2,
   RefreshCw,
   Search,
   UserCheck,
   UserPlus,
   Users,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
@@ -33,8 +35,11 @@ export default function EmployeesPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("ALL");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [form, setForm] = useState({
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [deletingEmployeeId, setDeletingEmployeeId] = useState<string | null>(null);
+
+  const initialFormState = {
     firstName: "",
     lastName: "",
     email: "",
@@ -43,7 +48,8 @@ export default function EmployeesPage() {
     role: "EMPLOYEE",
     departmentId: "",
     designation: "",
-  });
+  };
+  const [form, setForm] = useState(initialFormState);
 
   const {
     data: employees = [],
@@ -83,6 +89,27 @@ export default function EmployeesPage() {
 
   const activeCount = employees.filter((employee) => employee.isActive !== false).length;
 
+  const handleEditClick = (emp: Employee) => {
+    setEditingEmployee(emp);
+    setForm({
+      firstName: emp.firstName,
+      lastName: emp.lastName,
+      email: emp.email,
+      phone: "", // typically not returned in minimal list, handle gracefully
+      password: "", // do not populate password
+      role: emp.role,
+      departmentId: emp.department?.id || "",
+      designation: emp.employeeProfile?.designation || "",
+    });
+    setIsFormOpen(true);
+  };
+
+  const handleCloseForm = () => {
+    setIsFormOpen(false);
+    setEditingEmployee(null);
+    setForm(initialFormState);
+  };
+
   const createEmployee = useMutation({
     mutationFn: () =>
       apiClient.post("/employees", {
@@ -93,23 +120,39 @@ export default function EmployeesPage() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      setForm({
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        password: "",
-        role: "EMPLOYEE",
-        departmentId: "",
-        designation: "",
-      });
-      setIsCreateOpen(false);
+      handleCloseForm();
+    },
+  });
+
+  const updateEmployee = useMutation({
+    mutationFn: () =>
+      apiClient.patch(`/employees/${editingEmployee?.id}`, {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        role: form.role,
+        departmentId: form.departmentId || undefined,
+        designation: form.designation || undefined,
+        phone: form.phone || undefined,
+        ...(form.password ? { password: form.password } : {}),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      handleCloseForm();
+    },
+  });
+
+  const deleteEmployee = useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/employees/${id}`),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+      setDeletingEmployeeId(null);
     },
   });
 
   return (
     <DashboardLayout>
-      <div className="space-y-7">
+      <div className="space-y-7 relative">
         <section className="relative overflow-hidden rounded-[28px] bg-midnight-navy px-6 py-7 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] sm:px-8">
           <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-primary-indigo/50 blur-3xl" />
           <div className="absolute right-32 top-10 h-32 w-32 rounded-full bg-premium-teal/30 blur-3xl" />
@@ -128,7 +171,11 @@ export default function EmployeesPage() {
             </div>
             <button
               type="button"
-              onClick={() => setIsCreateOpen((open) => !open)}
+              onClick={() => {
+                setEditingEmployee(null);
+                setForm(initialFormState);
+                setIsFormOpen((open) => !open);
+              }}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-midnight-navy shadow-lg transition hover:-translate-y-0.5 hover:bg-slate-100"
             >
               <UserPlus className="h-4 w-4 text-primary-indigo" />
@@ -137,28 +184,32 @@ export default function EmployeesPage() {
           </div>
         </section>
 
-        {isCreateOpen && (
+        {isFormOpen && (
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              createEmployee.mutate();
+              if (editingEmployee) {
+                updateEmployee.mutate();
+              } else {
+                createEmployee.mutate();
+              }
             }}
             className="rounded-[24px] border border-indigo-100 bg-white p-6 shadow-sm dark:border-indigo-500/20 dark:bg-slate-900"
           >
             <div className="mb-5 flex items-start justify-between">
               <div>
                 <h2 className="font-heading text-xl font-semibold text-midnight-navy dark:text-white">
-                  Add a new employee
+                  {editingEmployee ? "Edit Employee" : "Add a new employee"}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Create the employee&apos;s directory profile and assign their role.
+                  {editingEmployee ? "Update the employee's directory profile and role." : "Create the employee's directory profile and assign their role."}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={handleCloseForm}
                 className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-                aria-label="Close employee form"
+                aria-label="Close form"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -207,15 +258,15 @@ export default function EmployeesPage() {
                 />
               </label>
               <label className="space-y-1.5 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Temporary password
+                {editingEmployee ? "Reset password (optional)" : "Temporary password"}
                 <input
-                  required
+                  required={!editingEmployee}
                   minLength={8}
                   type="password"
                   value={form.password}
                   onChange={(event) => setForm({ ...form, password: event.target.value })}
                   className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 outline-none focus:border-primary-indigo focus:ring-4 focus:ring-primary-indigo/10 dark:border-slate-700 dark:bg-slate-950"
-                  placeholder="Minimum 8 characters"
+                  placeholder={editingEmployee ? "Leave blank to keep unchanged" : "Minimum 8 characters"}
                   autoComplete="new-password"
                 />
               </label>
@@ -262,26 +313,26 @@ export default function EmployeesPage() {
               )}
             </div>
 
-            {createEmployee.error && (
+            {(createEmployee.error || updateEmployee.error) && (
               <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
-                Unable to add this employee. Check that the email is unique and try again.
+                {createEmployee.error ? "Unable to add this employee. Check that the email is unique." : "Unable to update this employee."}
               </p>
             )}
 
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={handleCloseForm}
                 className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={createEmployee.isPending}
+                disabled={createEmployee.isPending || updateEmployee.isPending}
                 className="rounded-xl bg-primary-indigo px-5 py-2 text-sm font-semibold text-white hover:bg-primary-indigo/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {createEmployee.isPending ? "Adding…" : "Add Employee"}
+                {createEmployee.isPending || updateEmployee.isPending ? "Saving…" : (editingEmployee ? "Update Employee" : "Add Employee")}
               </button>
             </div>
           </form>
@@ -371,7 +422,7 @@ export default function EmployeesPage() {
                   <article key={employee.id} className="group rounded-2xl border border-slate-200/80 bg-white p-5 transition duration-300 hover:-translate-y-1 hover:border-primary-indigo/25 hover:shadow-[0_18px_40px_rgba(67,56,202,0.10)] dark:border-slate-800 dark:bg-slate-950/60">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-indigo to-premium-teal text-sm font-bold text-white shadow-md shadow-indigo-500/20">
+                        <div className="flex h-13 w-13 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-indigo to-premium-teal text-sm font-bold text-white shadow-md shadow-indigo-500/20" style={{ width: '52px', height: '52px' }}>
                           {initials}
                         </div>
                         <div>
@@ -383,9 +434,22 @@ export default function EmployeesPage() {
                           </p>
                         </div>
                       </div>
-                      <button className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-midnight-navy dark:hover:bg-slate-800 dark:hover:text-white" aria-label={`Actions for ${employee.firstName}`}>
-                        <MoreHorizontal className="h-5 w-5" />
-                      </button>
+                      <div className="flex items-center gap-1 opacity-100 sm:opacity-0 transition-opacity group-hover:opacity-100">
+                        <button 
+                          onClick={() => handleEditClick(employee)}
+                          className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-primary-indigo dark:hover:bg-slate-800 dark:hover:text-primary-indigo" 
+                          aria-label={`Edit ${employee.firstName}`}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => setDeletingEmployeeId(employee.id)}
+                          className="rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/30 dark:hover:text-rose-400" 
+                          aria-label={`Delete ${employee.firstName}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-5 space-y-2.5 rounded-xl bg-slate-50 p-3.5 dark:bg-slate-900">
@@ -409,6 +473,38 @@ export default function EmployeesPage() {
           )}
         </section>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deletingEmployeeId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-4 text-rose-600 dark:text-rose-500 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-500/20">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-semibold text-midnight-navy dark:text-white">Delete Employee</h3>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">
+              Are you sure you want to delete this employee? This action cannot be undone and will remove their access to the system.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeletingEmployeeId(null)}
+                className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteEmployee.mutate(deletingEmployeeId)}
+                disabled={deleteEmployee.isPending}
+                className="rounded-xl bg-rose-600 px-5 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+              >
+                {deleteEmployee.isPending ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
