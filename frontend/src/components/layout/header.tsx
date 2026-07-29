@@ -10,6 +10,8 @@ import {
   Settings,
   Command,
   Menu,
+  LogOut,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -154,6 +156,21 @@ export function Header({ className, onMobileToggle }: HeaderProps) {
     setSearch("");
   };
 
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut({ scope: "local" });
+      localStorage.removeItem("token");
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      setIsSigningOut(false);
+    }
+  };
+
   return (
     <motion.header
       initial={{ y: -20, opacity: 0 }}
@@ -278,6 +295,24 @@ export function Header({ className, onMobileToggle }: HeaderProps) {
             </AvatarFallback>
           </Avatar>
         </button>
+
+        {/* Sign Out Button - Top Right beside Profile Pic */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+          className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-500/10 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-500/20 flex items-center gap-1.5 px-2.5 h-9 ml-1"
+          aria-label="Sign out"
+          title="Sign out"
+        >
+          {isSigningOut ? (
+            <Loader2 className="h-4 w-4 animate-spin text-red-600 dark:text-red-400" />
+          ) : (
+            <LogOut className="h-4 w-4 text-red-600 dark:text-red-400" />
+          )}
+          <span className="hidden sm:inline text-xs font-semibold">Sign Out</span>
+        </Button>
       </div>
     </motion.header>
   );

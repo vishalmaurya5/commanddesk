@@ -5,15 +5,18 @@ import { EmployeeService } from "@/lib/services/employee-service";
 import { apiError } from "@/lib/saas/api-error";
 import { provisionAuthUser } from "@/lib/provision-auth-user";
 
-const ASSIGNABLE_ROLES = new Set([
-  "EMPLOYEE",
-  "TEAM_LEAD",
-  "MANAGER",
+const SYSTEM_USER_ROLES = new Set([
+  "SUPER_ADMIN",
+  "ORGANIZATION_OWNER",
+  "ADMIN",
   "HR",
+  "MANAGER",
+  "TEAM_LEAD",
+  "EMPLOYEE",
   "FINANCE",
   "SALES",
   "SUPPORT",
-  "ADMIN",
+  "GUEST",
 ]);
 
 export async function GET() {
@@ -24,30 +27,37 @@ export async function GET() {
       companyId = session.user.companyId;
     }
 
+    const selectEmployeeFields = {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      role: true,
+      isActive: true,
+      departmentId: true,
+      departmentIds: true,
+      department: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      employeeProfile: {
+        select: {
+          designation: true,
+          aadhaarNumber: true,
+          aadhaarCardUrl: true,
+        },
+      },
+    };
+
     const employees = await prisma.user.findMany({
       where: {
         isActive: true,
         ...(companyId ? { companyId } : {}),
       },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        role: true,
-        isActive: true,
-        department: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        employeeProfile: {
-          select: {
-            designation: true,
-          },
-        },
-      },
+      select: selectEmployeeFields,
       orderBy: [
         { firstName: "asc" },
         { lastName: "asc" },
@@ -57,20 +67,7 @@ export async function GET() {
     if (employees.length === 0) {
       const allEmployees = await prisma.user.findMany({
         where: { isActive: true },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          role: true,
-          isActive: true,
-          department: {
-            select: { id: true, name: true },
-          },
-          employeeProfile: {
-            select: { designation: true },
-          },
-        },
+        select: selectEmployeeFields,
         orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
       });
       return NextResponse.json(allEmployees);
@@ -85,10 +82,13 @@ export async function GET() {
         firstName: true,
         lastName: true,
         email: true,
+        phone: true,
         role: true,
         isActive: true,
+        departmentId: true,
+        departmentIds: true,
         department: { select: { id: true, name: true } },
-        employeeProfile: { select: { designation: true } },
+        employeeProfile: { select: { designation: true, aadhaarNumber: true, aadhaarCardUrl: true } },
       },
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
     }).catch(() => []);
@@ -121,9 +121,12 @@ export async function POST(request: Request) {
       lastName?: string;
       role?: string;
       departmentId?: string;
+      departmentIds?: string[];
       designation?: string;
       phone?: string;
       password?: string;
+      aadhaarNumber?: string;
+      aadhaarCardUrl?: string;
     };
 
     if (
@@ -139,8 +142,16 @@ export async function POST(request: Request) {
     }
 
     const email = body.email.trim().toLowerCase();
-    const role = ASSIGNABLE_ROLES.has(body.role) ? body.role.trim() : "EMPLOYEE";
+    const rawRole = body.role.trim();
+    const isSystemRole = SYSTEM_USER_ROLES.has(rawRole);
+    const role = isSystemRole ? rawRole : "EMPLOYEE";
+    const designation = body.designation?.trim() || (!isSystemRole ? rawRole : "Team Member");
     const password = body.password || "TempPass123!";
+
+    const deptIds = body.departmentIds && Array.isArray(body.departmentIds)
+      ? body.departmentIds
+      : body.departmentId ? [body.departmentId] : [];
+    const primaryDeptId = deptIds[0] || body.departmentId || null;
 
     let authUserId: string | undefined;
     try {
@@ -169,15 +180,20 @@ export async function POST(request: Request) {
           role: role as any,
           isActive: true,
           companyId: companyId,
-          departmentId: body.departmentId || existingUser.departmentId,
+          departmentId: primaryDeptId,
+          departmentIds: deptIds,
           employeeProfile: {
             upsert: {
               create: {
                 employeeId: `EMP${Date.now()}`,
-                designation: body.designation?.trim() || "Team Member",
+                designation: designation,
+                aadhaarNumber: body.aadhaarNumber?.trim() || undefined,
+                aadhaarCardUrl: body.aadhaarCardUrl || undefined,
               },
               update: {
-                designation: body.designation?.trim() || "Team Member",
+                designation: designation,
+                ...(body.aadhaarNumber !== undefined ? { aadhaarNumber: body.aadhaarNumber.trim() } : {}),
+                ...(body.aadhaarCardUrl !== undefined ? { aadhaarCardUrl: body.aadhaarCardUrl } : {}),
               },
             },
           },
@@ -190,8 +206,10 @@ export async function POST(request: Request) {
           phone: true,
           role: true,
           isActive: true,
+          departmentId: true,
+          departmentIds: true,
           department: { select: { id: true, name: true } },
-          employeeProfile: { select: { designation: true } },
+          employeeProfile: { select: { designation: true, aadhaarNumber: true, aadhaarCardUrl: true } },
         },
       });
       return NextResponse.json(updatedUser, { status: 200 });
@@ -204,9 +222,12 @@ export async function POST(request: Request) {
       role,
       companyId: companyId,
       authUserId,
-      departmentId: body.departmentId || undefined,
-      designation: body.designation?.trim() || "Team Member",
+      departmentId: primaryDeptId || undefined,
+      departmentIds: deptIds,
+      designation: designation,
       phone: body.phone?.trim(),
+      aadhaarNumber: body.aadhaarNumber?.trim() || undefined,
+      aadhaarCardUrl: body.aadhaarCardUrl || undefined,
     });
 
     return NextResponse.json(employee, { status: 201 });

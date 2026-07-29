@@ -4,9 +4,9 @@ import { createClient } from "@/utils/supabase/server";
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
-  const code = url.searchParams.get("code");
   const token_hash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
+  const code = url.searchParams.get("code");
   const next = url.searchParams.get("next") || "/";
   const authError = url.searchParams.get("error") || url.searchParams.get("error_description");
 
@@ -44,4 +44,3 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.redirect(new URL("/auth/verify?error=invalid_or_expired_link", origin));
 }
-

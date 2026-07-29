@@ -29,7 +29,7 @@ export default function LoginPage() {
     setError("");
     try {
       if (mode === "sign-up") {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -37,8 +37,12 @@ export default function LoginPage() {
           },
         });
         if (signUpError) throw signUpError;
-        setError("Check your email to confirm your account.");
-        setMode("sign-in");
+        if (signUpData?.session) {
+          router.push("/");
+          router.refresh();
+          return;
+        }
+        router.push(`/auth/verify?email=${encodeURIComponent(email)}`);
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,

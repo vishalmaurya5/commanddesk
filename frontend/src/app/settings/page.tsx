@@ -81,7 +81,7 @@ function SettingsForm({
   canManageOrganization: boolean;
 }) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"profile" | "organization" | "security">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "organization" | "security" | "roles">("profile");
   const [message, setMessage] = useState("");
   const [profile, setProfile] = useState({
     firstName: initial.profile.firstName,
@@ -89,6 +89,8 @@ function SettingsForm({
     phone: initial.profile.phone,
   });
   const [organization, setOrganization] = useState(initial.organization);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleDesc, setNewRoleDesc] = useState("");
 
   const save = useMutation({
     mutationFn: () =>
@@ -121,11 +123,32 @@ function SettingsForm({
     },
   });
 
+  const { data: rolesData } = useQuery<{
+    customRoles?: Array<{ id: string; name: string; description?: string; _count?: { memberships: number } }>;
+  }>({
+    queryKey: ["settings-roles"],
+    queryFn: () => apiClient.get("/roles").then((res) => res.data),
+    enabled: activeTab === "roles",
+  });
+
+  const createRoleMutation = useMutation({
+    mutationFn: () => apiClient.post("/roles", { name: newRoleName, description: newRoleDesc }),
+    onSuccess: async () => {
+      setMessage("New custom role created successfully.");
+      setNewRoleName("");
+      setNewRoleDesc("");
+      await queryClient.invalidateQueries({ queryKey: ["settings-roles"] });
+      await queryClient.invalidateQueries({ queryKey: ["custom-roles"] });
+      window.setTimeout(() => setMessage(""), 3000);
+    },
+  });
+
   const tabs = [
     { id: "profile" as const, label: "Profile Info", icon: User },
     ...(canManageOrganization
       ? [{ id: "organization" as const, label: "Organization", icon: Building }]
       : []),
+    { id: "roles" as const, label: "Roles & Permissions", icon: Shield },
     { id: "security" as const, label: "Security", icon: Shield },
   ];
 
@@ -210,12 +233,91 @@ function SettingsForm({
           </div>
         )}
 
-        {activeTab === "security" && (
-          <div className="rounded-xl border border-border p-4">
-            <p className="font-semibold">Two-Factor Authentication</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Status: {initial.security.twoFactorEnabled ? "Enabled" : "Not enabled"}
-            </p>
+        {activeTab === "roles" && (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-border p-5 bg-card">
+              <h3 className="text-sm font-bold text-foreground mb-1">Create Custom Role</h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Define specialized job roles for workspace members with custom titles.
+              </p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (newRoleName.trim()) createRoleMutation.mutate();
+                }}
+                className="grid gap-3 sm:grid-cols-2"
+              >
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Role Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Lead Designer"
+                    value={newRoleName}
+                    onChange={(e) => setNewRoleName(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Description (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Brief description of responsibilities"
+                    value={newRoleDesc}
+                    onChange={(e) => setNewRoleDesc(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div className="sm:col-span-2 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={!newRoleName.trim() || createRoleMutation.isPending}
+                    className="inline-flex items-center gap-2 rounded-xl bg-primary-indigo px-4 py-2 text-xs font-semibold text-white hover:bg-primary-indigo/90 disabled:opacity-50"
+                  >
+                    {createRoleMutation.isPending ? "Creating Role..." : "+ Create Custom Role"}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="rounded-xl border border-border p-5 bg-card space-y-4">
+              <h3 className="text-sm font-bold text-foreground">Workspace Roles</h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {[
+                  { name: "Super Admin", type: "System", desc: "Full administrative access to all systems" },
+                  { name: "Organization Owner", type: "System", desc: "Workspace billing & organization owner" },
+                  { name: "Admin", type: "System", desc: "Full administrative access to workspace settings" },
+                  { name: "HR", type: "System", desc: "Human resources & employee management" },
+                  { name: "Manager", type: "System", desc: "Team & project management access" },
+                  { name: "Team Lead", type: "System", desc: "Team coordination & task assignments" },
+                  { name: "Employee", type: "System", desc: "Standard employee portal access" },
+                  { name: "Finance", type: "System", desc: "Financials, invoices, and payroll access" },
+                  { name: "Sales", type: "System", desc: "CRM, leads, and client deals management" },
+                  { name: "Support", type: "System", desc: "Customer support ticket desk access" },
+                  ...(rolesData?.customRoles || []).map((cr) => ({
+                    name: cr.name,
+                    type: "Custom",
+                    desc: cr.description || "Custom workspace role",
+                  })),
+                ].map((r, i) => (
+                  <div key={i} className="p-3.5 rounded-xl border border-border bg-background space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-xs text-foreground">{r.name}</span>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          r.type === "System"
+                            ? "bg-slate-100 dark:bg-slate-800 text-muted-foreground"
+                            : "bg-primary-indigo/10 text-primary-indigo font-bold"
+                        }`}
+                      >
+                        {r.type}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground line-clamp-2">{r.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

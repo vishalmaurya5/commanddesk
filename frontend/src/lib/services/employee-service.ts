@@ -34,9 +34,12 @@ export class EmployeeService {
     role: string;
     companyId: string;
     departmentId?: string;
+    departmentIds?: string[];
     designation?: string;
     phone?: string;
     authUserId?: string;
+    aadhaarNumber?: string;
+    aadhaarCardUrl?: string;
   }) {
     return prisma.user.create({
       data: {
@@ -48,10 +51,13 @@ export class EmployeeService {
         role: data.role as any,
         companyId: data.companyId,
         departmentId: data.departmentId,
+        departmentIds: data.departmentIds || (data.departmentId ? [data.departmentId] : []),
         employeeProfile: {
           create: {
             employeeId: `EMP${Date.now()}`,
             designation: data.designation,
+            aadhaarNumber: data.aadhaarNumber,
+            aadhaarCardUrl: data.aadhaarCardUrl,
           },
         },
       },
@@ -63,6 +69,8 @@ export class EmployeeService {
         phone: true,
         role: true,
         isActive: true,
+        departmentId: true,
+        departmentIds: true,
         department: {
           select: {
             id: true,
@@ -72,6 +80,8 @@ export class EmployeeService {
         employeeProfile: {
           select: {
             designation: true,
+            aadhaarNumber: true,
+            aadhaarCardUrl: true,
           },
         },
       },
@@ -79,15 +89,28 @@ export class EmployeeService {
   }
 
   static async update(id: string, data: any) {
-    const { designation, departmentId, ...userData } = data;
+    const { designation, departmentId, departmentIds, aadhaarNumber, aadhaarCardUrl, ...userData } = data;
     return prisma.user.update({
       where: { id },
       data: {
         ...userData,
         departmentId: departmentId === "" ? null : departmentId,
-        employeeProfile: designation
-          ? { update: { designation } }
-          : undefined,
+        ...(departmentIds !== undefined ? { departmentIds } : {}),
+        employeeProfile: {
+          upsert: {
+            create: {
+              employeeId: `EMP${Date.now()}`,
+              designation,
+              aadhaarNumber,
+              aadhaarCardUrl,
+            },
+            update: {
+              ...(designation !== undefined ? { designation } : {}),
+              ...(aadhaarNumber !== undefined ? { aadhaarNumber } : {}),
+              ...(aadhaarCardUrl !== undefined ? { aadhaarCardUrl } : {}),
+            },
+          },
+        },
       },
       include: { department: true, employeeProfile: true },
     });

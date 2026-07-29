@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { use } from 'react';
-import { ArrowLeft, Mail, Phone, MapPin, Building2, Calendar, Briefcase, DollarSign } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Building2, Calendar, Briefcase, DollarSign, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 export default function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -127,6 +127,37 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                         : 'Not disclosed'}
                     </p>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Identity & Aadhaar Details */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-midnight-navy">
+              <h3 className="mb-4 font-heading text-lg font-semibold text-midnight-navy dark:text-white flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-500" />
+                Identity & Aadhaar Verification
+              </h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Aadhaar Number</p>
+                  <p className="text-sm font-semibold tracking-wider font-mono text-midnight-navy dark:text-white mt-1">
+                    {employee.employeeProfile?.aadhaarNumber || 'Not provided'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Aadhaar Card Document</p>
+                  {employee.employeeProfile?.aadhaarCardUrl ? (
+                    <a
+                      href={employee.employeeProfile.aadhaarCardUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition"
+                    >
+                      <ShieldCheck className="h-4 w-4" /> View Aadhaar Card (JPG)
+                    </a>
+                  ) : (
+                    <p className="text-sm text-gray-400 mt-1">No document uploaded</p>
+                  )}
                 </div>
               </div>
             </div>

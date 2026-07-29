@@ -6,7 +6,7 @@ import Link from "next/link";
 const quickActionRoutes: Record<string, string> = {
   "New Project": "/projects",
   "Add Employee": "/employees",
-  "Create Invoice": "/finance",
+  "Create Invoice": "/finance/invoices",
   "New Task": "/tasks",
   "Add Lead": "/crm",
   "Run Report": "/analytics",

@@ -121,6 +121,7 @@ model User {
   companyId          String?
   department         Department?  @relation(fields: [departmentId], references: [id])
   departmentId       String?
+  departmentIds      String[]     @default([])
   manager            User?        @relation("ManagerEmployee", fields: [managerId], references: [id])
   managerId          String?
   employees          User[]       @relation("ManagerEmployee")
@@ -258,6 +259,7 @@ model EmployeeProfile {
   ifscCode         String?
   panNumber        String?
   aadhaarNumber    String?
+  aadhaarCardUrl   String?
   uanNumber        String?
   pfNumber         String?
   esiNumber        String?
