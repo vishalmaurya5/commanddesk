@@ -1,6 +1,7 @@
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { getRequestOrigin } from "@/utils/origin";
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -10,8 +11,7 @@ export async function GET(request: NextRequest) {
   const next = url.searchParams.get("next") || "/";
   const authError = url.searchParams.get("error") || url.searchParams.get("error_description");
 
-  const rawOrigin = url.origin && url.origin !== "null" ? url.origin : null;
-  const origin = rawOrigin || process.env.NEXT_PUBLIC_APP_URL || "https://commanddesk-gold.vercel.app";
+  const origin = getRequestOrigin(request);
 
   if (authError) {
     return NextResponse.redirect(
@@ -21,14 +21,21 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient();
 
+  // Handle password recovery flow
+  const isRecovery = type === "recovery" || next.includes("reset-password");
+  const targetDestination = isRecovery ? "/auth/reset-password" : next;
+
   if (token_hash && type) {
     const { error } = await supabase.auth.verifyOtp({
       type,
       token_hash,
     });
     if (!error) {
+      if (isRecovery) {
+        return NextResponse.redirect(new URL("/auth/reset-password", origin));
+      }
       return NextResponse.redirect(
-        new URL(`/auth/verify?status=success&next=${encodeURIComponent(next)}`, origin)
+        new URL(`/auth/verify?status=success&next=${encodeURIComponent(targetDestination)}`, origin)
       );
     }
   }
@@ -36,8 +43,11 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      if (isRecovery) {
+        return NextResponse.redirect(new URL("/auth/reset-password", origin));
+      }
       return NextResponse.redirect(
-        new URL(`/auth/verify?status=success&next=${encodeURIComponent(next)}`, origin)
+        new URL(`/auth/verify?status=success&next=${encodeURIComponent(targetDestination)}`, origin)
       );
     }
   }

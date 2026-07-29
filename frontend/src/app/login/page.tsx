@@ -7,21 +7,17 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 
+import { getAppOrigin } from "@/utils/origin";
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const getAppOrigin = () => {
-    if (typeof window !== "undefined" && window.location.origin && window.location.origin !== "null") {
-      return window.location.origin;
-    }
-    return process.env.NEXT_PUBLIC_APP_URL || "https://commanddesk-gold.vercel.app";
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,9 +74,9 @@ export default function LoginPage() {
       return;
     }
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${getAppOrigin()}/auth/callback?next=/settings`,
+      redirectTo: `${getAppOrigin()}/auth/callback?next=/auth/reset-password`,
     });
-    setError(resetError?.message ?? "Password reset email sent.");
+    setError(resetError?.message ?? "Password reset link sent! Check your inbox.");
   };
 
   return (
