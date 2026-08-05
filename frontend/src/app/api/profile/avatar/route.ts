@@ -45,14 +45,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const objectPath = `${authUserId || "user"}/${Date.now()}-${randomUUID()}.jpg`;
+    const extension =
+      file.type === "image/png" ? "png"
+      : file.type === "image/webp" ? "webp"
+      : file.type === "image/gif" ? "gif"
+      : "jpg";
+    const objectPath = `${authUserId || "user"}/${Date.now()}-${randomUUID()}.${extension}`;
+
+    // Read the body once - a Blob's stream cannot be consumed twice, so the
+    // fallback path below must reuse this buffer rather than re-read the file.
+    const bytes = await file.arrayBuffer();
     let avatarUrl: string;
 
     try {
       const supabase = await createClient();
       const upload = await supabase.storage
         .from("avatars")
-        .upload(objectPath, await file.arrayBuffer(), {
+        .upload(objectPath, bytes, {
           contentType: file.type || "image/jpeg",
           cacheControl: "3600",
           upsert: false,
@@ -61,9 +70,28 @@ export async function POST(request: Request) {
       if (upload.error) throw upload.error;
       const { data } = supabase.storage.from("avatars").getPublicUrl(objectPath);
       avatarUrl = data.publicUrl;
-    } catch {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      avatarUrl = `data:${file.type};base64,${buffer.toString("base64")}`;
+    } catch (storageError) {
+      // Storing the image as a base64 data URL inflates it by ~33% and puts it
+      // in a column read on every page load, so only fall back for small files
+      // and make the real cause visible instead of swallowing it.
+      console.error(
+        "Avatar storage upload failed - check that the 'avatars' bucket exists and its RLS policy allows this user:",
+        storageError,
+      );
+
+      const INLINE_FALLBACK_LIMIT = 256 * 1024;
+      if (bytes.byteLength > INLINE_FALLBACK_LIMIT) {
+        return NextResponse.json(
+          {
+            error:
+              "Image storage is unavailable. Upload an image under 256 KB, or ask an administrator to configure the avatars storage bucket.",
+          },
+          { status: 503 },
+        );
+      }
+
+      const buffer = Buffer.from(bytes);
+      avatarUrl = `data:${file.type || "image/jpeg"};base64,${buffer.toString("base64")}`;
     }
 
     if (userId) {
