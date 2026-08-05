@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +19,9 @@ export class AuthorizationError extends Error {
   }
 }
 
-export async function getAccessContext() {
+// Also request-scoped: routes commonly call authorize() more than once, and
+// each call previously re-ran the membership lookup.
+export const getAccessContext = cache(async function getAccessContext() {
   const session = await auth();
   if (!session) throw new AuthorizationError("Authentication required", 401);
   if (!session.user.companyId) throw new AuthorizationError("Select a workspace", 403);
@@ -73,7 +76,7 @@ export async function getAccessContext() {
     permissions,
     membership,
   };
-}
+});
 
 export async function authorize(permission: Permission) {
   const access = await getAccessContext();

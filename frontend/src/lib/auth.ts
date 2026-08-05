@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { Prisma } from "@prisma/client";
 import { createClient } from "@/utils/supabase/server";
@@ -23,8 +24,13 @@ export type AppSession = {
  * Supabase-backed session adapter. It preserves the old `await auth()` call
  * shape so existing pages and route handlers stay compatible while identity
  * and sessions are handled by Supabase Auth.
+ *
+ * Wrapped in React `cache()` so that repeated `auth()` calls within a single
+ * request are deduplicated. A page that renders the sidebar, the header and
+ * calls `authorize()` used to run this whole Supabase + Prisma sequence once
+ * per call site.
  */
-export async function auth(): Promise<AppSession> {
+export const auth = cache(async function auth(): Promise<AppSession> {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
 
@@ -236,4 +242,4 @@ export async function auth(): Promise<AppSession> {
       companyName: company.name,
     },
   };
-}
+});

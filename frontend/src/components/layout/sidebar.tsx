@@ -96,12 +96,14 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
   const { data: notificationData } = useQuery({
     queryKey: ["notifications", "badge"],
     queryFn: () => apiClient.get("/notifications?unread=true").then((response) => response.data),
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    staleTime: 55000,
   });
   const { data: messageData } = useQuery({
     queryKey: ["messages", "badge"],
-    queryFn: () => apiClient.get("/messages").then((response) => response.data),
-    refetchInterval: 10000,
+    queryFn: () => apiClient.get("/messages?countOnly=1").then((response) => response.data),
+    refetchInterval: 60000,
+    staleTime: 55000,
   });
 
   const loadAccess = useCallback(async () => {

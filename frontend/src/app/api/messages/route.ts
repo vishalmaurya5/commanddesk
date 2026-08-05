@@ -7,7 +7,32 @@ import { PERMISSIONS } from "@/lib/saas/permissions";
 export async function GET(request: Request) {
   try {
     const { userId, companyId } = await authorize(PERMISSIONS.MESSAGES_USE);
-    const chatId = new URL(request.url).searchParams.get("chatId");
+    const searchParams = new URL(request.url).searchParams;
+    const chatId = searchParams.get("chatId");
+
+    // Badge-only path for the header/sidebar poll: two aggregate queries instead
+    // of loading every chat, every participant, the org user list and a
+    // per-chat unread count.
+    if (searchParams.get("countOnly")) {
+      const participants = await prisma.chatParticipant.findMany({
+        where: { userId },
+        select: { chatId: true, lastReadAt: true },
+      });
+      if (participants.length === 0) {
+        return NextResponse.json({ unreadCount: 0 });
+      }
+      const unreadCount = await prisma.message.count({
+        where: {
+          senderId: { not: userId },
+          OR: participants.map((participant) => ({
+            chatId: participant.chatId,
+            createdAt: { gt: participant.lastReadAt },
+          })),
+        },
+      });
+      return NextResponse.json({ unreadCount });
+    }
+
     const [participants, users] = await Promise.all([
       prisma.chatParticipant.findMany({
         where: { userId },
@@ -23,11 +48,28 @@ export async function GET(request: Request) {
       }),
       prisma.user.findMany({ where: { companyId, isActive: true, id: { not: userId } }, select: { id: true, firstName: true, lastName: true, avatarUrl: true }, orderBy: [{ firstName: "asc" }, { lastName: "asc" }] }),
     ]);
-    const chats = await Promise.all(participants.map(async (participant) => {
-      const unread = await prisma.message.count({ where: { chatId: participant.chatId, senderId: { not: userId }, createdAt: { gt: participant.lastReadAt } } });
+    // Previously this issued one COUNT per chat (N+1). Group the counts into a
+    // single query, then look each chat up in the resulting map.
+    const unreadRows = participants.length
+      ? await prisma.message.groupBy({
+          by: ["chatId"],
+          _count: { _all: true },
+          where: {
+            senderId: { not: userId },
+            OR: participants.map((participant) => ({
+              chatId: participant.chatId,
+              createdAt: { gt: participant.lastReadAt },
+            })),
+          },
+        })
+      : [];
+    const unreadByChat = new Map(unreadRows.map((row) => [row.chatId, row._count._all]));
+
+    const chats = participants.map((participant) => {
+      const unread = unreadByChat.get(participant.chatId) ?? 0;
       const other = participant.chat.participants.find((item) => item.userId !== userId)?.user;
       return { id: participant.chatId, name: participant.chat.isGroup ? participant.chat.name || "Group" : other ? `${other.firstName} ${other.lastName}` : "Conversation", isGroup: participant.chat.isGroup, unread, lastMessage: participant.chat.messages[0]?.content ?? "", updatedAt: participant.chat.updatedAt };
-    }));
+    });
     let messages: unknown[] = [];
     if (chatId) {
       const member = participants.some((item) => item.chatId === chatId);
