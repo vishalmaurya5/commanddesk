@@ -167,20 +167,27 @@ export default function EmployeesPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate JPG format
+    // Validate format (JPG, PNG, WEBP, PDF)
+    const allowedTypes = new Set([
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "application/pdf",
+    ]);
     const fileName = file.name.toLowerCase();
-    const isJpg = file.type === "image/jpeg" || file.type === "image/jpg" || fileName.endsWith(".jpg") || fileName.endsWith(".jpeg");
-    if (!isJpg) {
-      setAadhaarUploadError("Invalid file type. Only JPG/JPEG images (.jpg, .jpeg) are allowed.");
+    const isAllowedExt = /\.(jpe?g|png|webp|pdf)$/i.test(fileName);
+    if (!allowedTypes.has(file.type) && !isAllowedExt) {
+      setAadhaarUploadError("Invalid file type. Only JPG, PNG, WEBP images or PDF files are allowed.");
       e.target.value = "";
       return;
     }
 
-    // Validate File Size <= 150 KB
-    const maxKb = 150;
-    const actualKb = file.size / 1024;
-    if (actualKb > maxKb) {
-      setAadhaarUploadError(`File size (${actualKb.toFixed(1)} KB) exceeds the maximum 150 KB limit.`);
+    // Validate File Size <= 5 MB
+    const maxMb = 5;
+    const actualMb = file.size / (1024 * 1024);
+    if (actualMb > maxMb) {
+      setAadhaarUploadError(`File size (${actualMb.toFixed(1)} MB) exceeds the maximum 5 MB limit.`);
       e.target.value = "";
       return;
     }
@@ -531,21 +538,21 @@ export default function EmployeesPage() {
                     />
                   </label>
 
-                  {/* Aadhaar Card Upload (JPG, Max 150 KB) */}
+                  {/* Aadhaar Card Upload (JPG, PNG, WEBP, PDF - Max 5 MB) */}
                   <div className="space-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                    <span>Aadhaar Card Copy (JPG, Max 150 KB)</span>
+                    <span>Aadhaar Card Copy (JPG, PNG, WEBP, PDF - Max 5 MB)</span>
                     <div className="flex items-center gap-2">
                       <label className="flex-1 h-11 px-3 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900 flex items-center justify-between cursor-pointer transition">
                         <span className="text-xs text-slate-500 truncate">
                           {isUploadingAadhaar
-                            ? "Uploading JPG..."
+                            ? "Uploading Card..."
                             : form.aadhaarCardUrl
-                            ? "Change Aadhaar Card JPG"
-                            : "Choose JPG Image (<= 150 KB)"}
+                            ? "Change Aadhaar Card File"
+                            : "Choose Image or PDF (<= 5 MB)"}
                         </span>
                         <input
                           type="file"
-                          accept=".jpg,.jpeg,image/jpeg"
+                          accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
                           onChange={handleAadhaarFileUpload}
                           className="hidden"
                           disabled={isUploadingAadhaar}

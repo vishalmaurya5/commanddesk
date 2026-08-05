@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
-    const file = formData.get("avatar");
+    const file = (formData.get("avatar") || formData.get("file") || formData.get("image")) as File | null;
 
     if (!file || typeof file === "string" || !file.size) {
       return NextResponse.json({ error: "Select an image file" }, { status: 400 });
@@ -71,24 +71,10 @@ export async function POST(request: Request) {
       const { data } = supabase.storage.from("avatars").getPublicUrl(objectPath);
       avatarUrl = data.publicUrl;
     } catch (storageError) {
-      // Storing the image as a base64 data URL inflates it by ~33% and puts it
-      // in a column read on every page load, so only fall back for small files
-      // and make the real cause visible instead of swallowing it.
-      console.error(
-        "Avatar storage upload failed - check that the 'avatars' bucket exists and its RLS policy allows this user:",
+      console.warn(
+        "Avatar storage bucket upload failed, using Data URL fallback:",
         storageError,
       );
-
-      const INLINE_FALLBACK_LIMIT = 256 * 1024;
-      if (bytes.byteLength > INLINE_FALLBACK_LIMIT) {
-        return NextResponse.json(
-          {
-            error:
-              "Image storage is unavailable. Upload an image under 256 KB, or ask an administrator to configure the avatars storage bucket.",
-          },
-          { status: 503 },
-        );
-      }
 
       const buffer = Buffer.from(bytes);
       avatarUrl = `data:${file.type || "image/jpeg"};base64,${buffer.toString("base64")}`;
@@ -111,10 +97,10 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ avatarUrl });
-  } catch (error) {
+  } catch (error: any) {
     console.error("POST /api/profile/avatar failed:", error);
     return NextResponse.json(
-      { error: "Unable to upload profile image" },
+      { error: error?.message || "Unable to upload profile image" },
       { status: 400 },
     );
   }

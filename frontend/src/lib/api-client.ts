@@ -16,7 +16,14 @@ apiClient.interceptors.request.use(
     // otherwise override it and request.formData() fails to parse on the
     // server. Deleting the header lets axios set it from the body.
     if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
-      delete config.headers['Content-Type'];
+      if (config.headers) {
+        if (typeof config.headers.delete === 'function') {
+          config.headers.delete('Content-Type');
+          config.headers.delete('content-type');
+        }
+        delete (config.headers as any)['Content-Type'];
+        delete (config.headers as any)['content-type'];
+      }
     }
 
     if (typeof window !== 'undefined') {

@@ -191,13 +191,14 @@ function SettingsForm({
                 )}
               </div>
               <div>
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary-indigo px-4 py-2 text-sm font-semibold text-white">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-primary-indigo px-4 py-2 text-sm font-semibold text-white hover:bg-primary-indigo/90 transition">
                   <Camera className="h-4 w-4" />
-                  Upload JPG
+                  {uploadAvatar.isPending ? "Uploading Image..." : "Upload Profile Photo"}
                   <input
                     type="file"
-                    accept=".jpg,.jpeg,image/jpeg"
+                    accept="image/*"
                     className="hidden"
+                    disabled={uploadAvatar.isPending}
                     onChange={(event) => {
                       const file = event.target.files?.[0];
                       if (file) uploadAvatar.mutate(file);
@@ -206,7 +207,7 @@ function SettingsForm({
                   />
                 </label>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  JPG or JPEG only. Maximum size 100 KB.
+                  JPG, PNG, WEBP, or GIF. Maximum size 5 MB.
                 </p>
               </div>
             </div>
